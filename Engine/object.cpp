@@ -1,4 +1,4 @@
-#include "Engine/object.h"
+#include "Engine/object.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
 Object::Object() {
@@ -43,14 +43,42 @@ void Object::setupMesh() {
     // Normal
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(2);
+    // TexCoord
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+    glEnableVertexAttribArray(3);
 }
 
-glm::mat4 Object::getModelMatrix() {
-    glm::mat4 model(1.0f);
+glm::mat4 Object::getModelMatrix() const {
+    glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, position);
-    model = glm::rotate(model, rotation.x, glm::vec3(1,0,0));
-    model = glm::rotate(model, rotation.y, glm::vec3(0,1,0));
-    model = glm::rotate(model, rotation.z, glm::vec3(0,0,1));
+    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1,0,0));
+    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0,1,0));
+    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0,0,1));
     model = glm::scale(model, scale);
     return model;
+}
+
+void Object::texture(const std::string& path) {
+    texturePath = path;
+
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Wrapping/filtering options
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
+    if (data) {
+        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        std::cerr << "Failed to load texture: " << path << std::endl;
+        std::cerr << "stbi_failure_reason: " << stbi_failure_reason() << std::endl;
+    }
+    stbi_image_free(data);
 }

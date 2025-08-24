@@ -1,3 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
+
 #include <SDL3/SDL.h>
 #include <iostream>
 #include "glad/glad.h"
@@ -5,12 +7,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "shaderc.h"
-#include "input.h"
-#include "Engine/sceneManager.h"
-#include "Util/shapegen.h"
+#include "shaderc.hpp"
+#include "input.hpp"
+#include "Engine/sceneManager.hpp"
+#include "util/shapegen.hpp"
 
-#include "GameMain.h"
+#include "GameMain.hpp"
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -23,7 +25,7 @@ int main(int argc, char* argv[]) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
     SDL_Window* window = SDL_CreateWindow("GENGINE",
-                                          800, 600,
+                                          1024, 768,
                                           SDL_WINDOW_OPENGL);
 
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
@@ -47,15 +49,15 @@ int main(int argc, char* argv[]) {
 
     EditorInput inputHandler(window);
 
-    GameMain game;
-    game.Start();
-
     Uint64 NOW = SDL_GetTicks();
     Uint64 LAST = 0;
     float deltaTime = 0.016f;
 
     bool running = true;
     SDL_Event event;
+
+    GameMain game;
+    game.Start();
     while (running) {
         LAST = NOW;
         NOW = SDL_GetTicks();
@@ -74,7 +76,7 @@ int main(int argc, char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glm::mat4 view = glm::lookAt(inputHandler.cameraPos,inputHandler.cameraPos+inputHandler.cameraFront,inputHandler.cameraUp);
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f),800.0f/600.0f,0.1f,100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f),1024.0f/768.0f,0.1f,100.0f);
 
         glUseProgram(shaderProgram);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"view"),1,GL_FALSE,glm::value_ptr(view));

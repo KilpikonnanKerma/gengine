@@ -1,5 +1,5 @@
-#include <Engine/game.h>
-#include <Engine/sceneManager.h>
+#include <Engine/game.hpp>
+#include <Engine/sceneManager.hpp>
 
 class GameMain : Game {
 public:
@@ -10,4 +10,8 @@ public:
     void Update(float dt);
 
     SceneManager scene;
+
+    Object floor;
+    Object cube1;
+    Object sphere1;
 };

@@ -1,18 +1,18 @@
 #ifndef SCENEMANAGER_H
 #define SCENEMANAGER_H
 
-#include "Engine/object.h"
-#include "Engine/light.h"
+#include "Engine/object.hpp"
+#include "Engine/light.hpp"
 
 #include <string>
 #include <vector>
 
 class SceneManager {
 public:
-    std::vector<Object> objects;
+    std::vector<Object*> objects;
     std::vector<Light> lights;
 
-    void addObject(const Object& obj);
+    void addObject(Object& obj);
     void addLight(const Light& light);
 
     void update(float deltaTime);

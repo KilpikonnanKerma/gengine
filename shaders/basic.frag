@@ -19,20 +19,33 @@ uniform PointLight pointLights[MAX_POINT_LIGHTS];
 uniform int numDirLights;
 uniform int numPointLights;
 
+uniform sampler2D uTexture;
+uniform bool useTexture;
+
 in vec3 FragPos;
 in vec3 Color;
 in vec3 Normal;
+in vec2 TexCoord;
+
 out vec4 FragColor;
 
 void main() {
     vec3 norm = normalize(Normal);
     vec3 result = vec3(0.0);
 
+    // Get base color (from texture OR from vertex color)
+    vec3 baseColor;
+    if (useTexture) {
+        baseColor = texture(uTexture, TexCoord).rgb; 
+    } else {
+        baseColor = Color;
+    }
+
     // Directional lights
     for(int i=0;i<numDirLights;i++){
         vec3 lightDir = normalize(-dirLights[i].direction);
         float diff = max(dot(norm, lightDir),0.0);
-        result += (0.1 + diff * dirLights[i].intensity) * dirLights[i].color * Color;
+        result += (0.1 + diff * dirLights[i].intensity) * dirLights[i].color * baseColor;
     }
 
     // Point lights
@@ -41,7 +54,7 @@ void main() {
         float diff = max(dot(norm, lightDir),0.0);
         float distance = length(pointLights[i].position - FragPos);
         float attenuation = 1.0 / (distance*distance);
-        result += (0.1 + diff * pointLights[i].intensity * attenuation) * pointLights[i].color * Color;
+        result += (0.1 + diff * pointLights[i].intensity * attenuation) * pointLights[i].color * baseColor;
     }
 
     FragColor = vec4(result,1.0);

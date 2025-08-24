@@ -1,4 +1,4 @@
-#include "input.h"
+#include "input.hpp"
 
 EditorInput::EditorInput(SDL_Window* window) {
     cameraPos   = glm::vec3(2.0f, 2.0f, 3.0f);

@@ -1,8 +1,8 @@
-#include "Engine/sceneManager.h"
+#include "Engine/sceneManager.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
-void SceneManager::addObject(const Object& obj) {
-    objects.push_back(obj);
+void SceneManager::addObject(Object& obj) {
+    objects.push_back(&obj);
 }
 
 void SceneManager::addLight(const Light& light){
@@ -12,9 +12,9 @@ void SceneManager::addLight(const Light& light){
 
 void SceneManager::update(float deltaTime) {
     // Example: rotate all objects slowly
-    for(auto& obj : objects) {
-        obj.rotation.y += 0.5f * deltaTime;
-    }
+    // for(auto& obj : objects) {
+    //     obj.rotation.y = obj.rotation.y;
+    // }
 }
 
 void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
@@ -45,7 +45,7 @@ void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm
 
     // OBJECTS
     for(auto& obj : objects) {
-        glm::mat4 model = obj.getModelMatrix();
+        glm::mat4 model = obj->getModelMatrix();
         unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
         unsigned int viewLoc  = glGetUniformLocation(shaderProgram, "view");
         unsigned int projLoc  = glGetUniformLocation(shaderProgram, "projection");
@@ -54,7 +54,15 @@ void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-        glBindVertexArray(obj.VAO);
-        glDrawElements(GL_TRIANGLES, obj.indices.size(), GL_UNSIGNED_INT, 0);
+        if (obj->textureID != 0) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, obj->textureID);
+            glUniform1i(glGetUniformLocation(shaderProgram, "uTexture"), 0);
+            glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 1);
+        } else {
+            glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 0);
+        }
+        glBindVertexArray(obj->VAO);
+        glDrawElements(GL_TRIANGLES, obj->indices.size(), GL_UNSIGNED_INT, 0);
     }
 }

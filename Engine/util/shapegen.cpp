@@ -1,4 +1,4 @@
-#include "Util/shapegen.h"
+#include "util/shapegen.hpp"
 
 void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
     float h = size / 2.0f;
@@ -16,12 +16,19 @@ void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, st
         {0,0,-1}, {0,0,1}, {-1,0,0}, {1,0,0}, {0,1,0}, {0,-1,0}
     };
 
+    glm::vec2 uvs[4] = {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f},
+        {0.0f, 1.0f}
+    };
+
     glm::vec3 color = {1,1,1};
 
     for(int f=0; f<6; f++){
         unsigned int startIndex = outVertices.size();
         for(int v=0; v<4; v++){
-            outVertices.push_back({facePositions[f][v], color, normals[f]});
+            outVertices.push_back({facePositions[f][v], color, normals[f], uvs[v]});
         }
         // two triangles per face
         outIndices.push_back(startIndex);
@@ -42,12 +49,19 @@ void ShapeGenerator::createPlane(float width, float height, std::vector<Vertex>&
         {-w, 0, -h}, {w, 0, -h}, {w, 0, h}, {-w, 0, h}
     };
 
+    glm::vec2 uvs[4] = {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f},
+        {0.0f, 1.0f}
+    };
+
     glm::vec3 normal = {0,1,0};
     glm::vec3 color = {1,1,1};
 
     unsigned int startIndex = outVertices.size();
     for(int i=0;i<4;i++)
-        outVertices.push_back({positions[i], color, normal});
+        outVertices.push_back({positions[i], color, normal, uvs[i]});
 
     outIndices.push_back(startIndex);
     outIndices.push_back(startIndex+1);
@@ -66,12 +80,16 @@ void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>
         {-h,-height/2.0f,-h}, {h,-height/2.0f,-h}, {h,-height/2.0f,h}, {-h,-height/2.0f,h}
     };
 
+    glm::vec2 baseUVs[4] = {
+        {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}
+    };
+
     glm::vec3 color = {1,1,1};
 
     // base
     unsigned int startIndex = outVertices.size();
     for(int i=0;i<4;i++)
-        outVertices.push_back({base[i], color, {0,-1,0}});
+        outVertices.push_back({base[i], color, {0,-1,0}, baseUVs[i]});
 
     outIndices.push_back(startIndex);
     outIndices.push_back(startIndex+1);
@@ -84,14 +102,17 @@ void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>
     for(int i=0;i<4;i++){
         unsigned int idx = outVertices.size();
         glm::vec3 next = base[(i+1)%4];
-        // compute normal
+        glm::vec2 uv0 = {0.0f, 0.0f};
+        glm::vec2 uv1 = {1.0f, 0.0f};
+        glm::vec2 uv2 = {0.5f, 1.0f};
+
         glm::vec3 edge1 = next - base[i];
         glm::vec3 edge2 = top - base[i];
         glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
 
-        outVertices.push_back({base[i], color, normal});
-        outVertices.push_back({next, color, normal});
-        outVertices.push_back({top, color, normal});
+        outVertices.push_back({base[i], color, normal, uv0});
+        outVertices.push_back({next,   color, normal, uv1});
+        outVertices.push_back({top,    color, normal, uv2});
 
         outIndices.push_back(idx);
         outIndices.push_back(idx+1);
@@ -111,7 +132,9 @@ void ShapeGenerator::createSphere(float radius, int segments, int rings, std::ve
 
             glm::vec3 pos = {xPos,yPos,zPos};
             glm::vec3 normal = glm::normalize(pos);
-            outVertices.push_back({pos,color,normal});
+            glm::vec2 texCoord = {xSegment, ySegment};
+
+            outVertices.push_back({pos,color,normal,texCoord});
         }
     }
 
@@ -131,4 +154,29 @@ void ShapeGenerator::createSphere(float radius, int segments, int rings, std::ve
             outIndices.push_back(i3);
         }
     }
+}
+
+unsigned int loadTexture(const char* path) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
+    if (data) {
+        GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
+                     GL_UNSIGNED_BYTE, data);
+
+        // filtering & wrapping
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    } else {
+        std::cerr << "Failed to load texture: " << path << std::endl;
+    }
+    stbi_image_free(data);
+    return textureID;
 }

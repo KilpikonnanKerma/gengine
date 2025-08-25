@@ -1,3 +1,6 @@
+#ifndef GAME_MAIN_HPP
+#define GAME_MAIN_HPP
+
 #include <Engine/game.hpp>
 #include <Engine/sceneManager.hpp>
 
@@ -11,7 +14,9 @@ public:
 
     SceneManager scene;
 
-    Object floor;
-    Object cube1;
-    Object sphere1;
+    Object* floor;
+    Object* cube1;
+    Object* sphere1;
 };
+
+#endif

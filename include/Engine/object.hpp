@@ -10,7 +10,9 @@ class Object {
 public:
     glm::vec3 position;
     glm::vec3 rotation;             // Euler angles
+    std::string type;
     glm::vec3 scale;
+    std::string name;
 
     unsigned int VAO, VBO, EBO;
     unsigned int textureID;
@@ -23,11 +25,14 @@ public:
     void initCube(float size);
     void initPlane(float width, float height);
     void initSphere(float radius, int segments, int rings);
+    void initPyramid(float size, float height);
 
     void setupMesh();
     glm::mat4 getModelMatrix() const;
 
     void texture(const std::string& path);
+    void draw() const;
+    float boundingRadius() const;
 };
 
 #endif

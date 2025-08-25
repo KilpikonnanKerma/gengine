@@ -10,8 +10,8 @@ EditorInput::EditorInput(SDL_Window* window) {
     speed = 2.5f;
     sensitivity = 0.1f;
 
-    SDL_HideCursor();
-    SDL_SetWindowRelativeMouseMode(window, true);
+    // SDL_HideCursor();
+    // SDL_SetWindowRelativeMouseMode(window, true);
 }
 
 void EditorInput::processKeyboard(float deltaTime) {
@@ -24,6 +24,30 @@ void EditorInput::processKeyboard(float deltaTime) {
     if (state[SDL_SCANCODE_D]) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
     if (state[SDL_SCANCODE_SPACE]) cameraPos += cameraSpeed * cameraUp;
     if (state[SDL_SCANCODE_LSHIFT]) cameraPos -= cameraSpeed * cameraUp;
+}
+
+void EditorInput::handleEvent(SDL_Event& e, SDL_Window* window) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) {
+        return;
+    }
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_RIGHT) {
+        rightMouseHeld = true;
+        SDL_HideCursor();
+        SDL_SetWindowRelativeMouseMode(window, true);
+    }
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_RIGHT) {
+        rightMouseHeld = false;
+        SDL_ShowCursor();
+        SDL_SetWindowRelativeMouseMode(window, false);
+    }
+    if (rightMouseHeld && e.type == SDL_EVENT_MOUSE_MOTION) {
+        processMouse(e);
+    }
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+        leftMouseClicked = true;
+        SDL_GetMouseState(&mouseX, &mouseY);
+    }
 }
 
 void EditorInput::processMouse(SDL_Event& e) {

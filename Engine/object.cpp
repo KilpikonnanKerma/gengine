@@ -1,24 +1,35 @@
 #include "Engine/object.hpp"
 #include <glm/gtc/matrix_transform.hpp>
+#include "Engine/object.hpp"
 
 Object::Object() {
     position = glm::vec3(0.0f);
     rotation = glm::vec3(0.0f);
     scale    = glm::vec3(1.0f);
+    name = "Unnamed object";
 }
 
 void Object::initCube(float size) {
     ShapeGenerator::createCube(size, vertices, indices);
+    type="Cube";
     setupMesh();
 }
 
 void Object::initPlane(float width, float height) {
     ShapeGenerator::createPlane(width, height, vertices, indices);
+    type="Plane";
     setupMesh();
 }
 
 void Object::initSphere(float radius, int segments, int rings) {
     ShapeGenerator::createSphere(radius, segments, rings, vertices, indices);
+    type="Sphere";
+    setupMesh();
+}
+
+void Object::initPyramid(float size, float height) {
+    ShapeGenerator::createPyramid(size, height, vertices, indices);
+    type="Pyramid";
     setupMesh();
 }
 
@@ -64,7 +75,6 @@ void Object::texture(const std::string& path) {
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Wrapping/filtering options
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -81,4 +91,13 @@ void Object::texture(const std::string& path) {
         std::cerr << "stbi_failure_reason: " << stbi_failure_reason() << std::endl;
     }
     stbi_image_free(data);
+}
+
+void Object::draw() const {
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+}
+
+float Object::boundingRadius() const {
+    return glm::length(scale); // or a fixed value, or calculate from mesh
 }

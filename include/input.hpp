@@ -6,6 +6,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "imgui.h"
+
 class EditorInput {
 
 public:
@@ -18,8 +20,15 @@ public:
     float speed;
     float sensitivity;
 
+    bool leftMouseClicked = false;
+    float mouseX = 0, mouseY = 0;
+
+    bool rightMouseHeld = false;
+
     EditorInput(SDL_Window* window);
     void processKeyboard(float deltaTime);
+
+    void handleEvent(SDL_Event& e, SDL_Window* window);
     void processMouse(SDL_Event& e);
 };
 

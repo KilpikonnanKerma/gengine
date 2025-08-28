@@ -1,0 +1,3 @@
+[submodule "include/nsmlib"]
+	path = include/nsmlib
+	url = https://github.com/KilpikonnanKerma/nsmlib.git

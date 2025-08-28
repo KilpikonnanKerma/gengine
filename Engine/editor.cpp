@@ -55,8 +55,8 @@ void Editor::MainMenu() {
             if (ImGui::MenuItem("Load Scene")) LoadScene();
             ImGui::EndMenu();
         }
-        ImGui::EndMainMenuBar();
     }
+    ImGui::EndMainMenuBar();
 }
 
 void Editor::EditorGUI() {
@@ -74,9 +74,9 @@ void Editor::EditorGUI() {
             ImGui::InputFloat3("Rotation", rot, "%.2f");
             ImGui::InputFloat("Scale", &scale, 0.0f, 0.0f, "%.2f");
 
-            obj->position = glm::vec3(pos[0],pos[1],pos[2]);
-            obj->rotation = glm::vec3(rot[0],rot[1],rot[2]);
-            obj->scale = glm::vec3(scale);
+            obj->position = Vec3d(pos[0],pos[1],pos[2]);
+            obj->rotation = Vec3d(rot[0],rot[1],rot[2]);
+            obj->scale = Vec3d(scale);
         }
 
         if (ImGui::CollapsingHeader("Texture", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -86,6 +86,20 @@ void Editor::EditorGUI() {
             }
             if (obj->textureID) ImGui::Image((void*)(intptr_t)obj->textureID, ImVec2(128,128));
         }
+    } 
+    if (game->scene.selectedLightIndex >= 0) {
+        Light& l = game->scene.lights[game->scene.selectedLightIndex];
+        float pos[3] = { l.position.x, l.position.y, l.position.z };
+        float col[3] = { l.color.x, l.color.y, l.color.z };
+        float intensity = l.intensity;
+        if (ImGui::CollapsingHeader("Light Properties", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::InputFloat3("Position", pos);
+            ImGui::ColorEdit3("Color", col);
+            ImGui::InputFloat("Intensity", &intensity);
+            l.position = Vec3d(pos[0], pos[1], pos[2]);
+            l.color = Vec3d(col[0], col[1], col[2]);
+            l.intensity = intensity;
+        }
     }
 
     editorWidth = ImGui::GetWindowWidth();
@@ -94,6 +108,17 @@ void Editor::EditorGUI() {
 
 void Editor::SceneGUI() {
     ImGui::Begin("Scene");
+
+    for (size_t i = 0; i < game->scene.lights.size(); ++i) {
+        Light& l = game->scene.lights[i];
+        ImGui::PushID((int)(1000 + i));
+        bool selected = (game->scene.selectedLightIndex == (int)i);
+        if (ImGui::Selectable(std::string("Light_" + std::to_string(i)).c_str(), selected)) {
+            game->scene.selectedLightIndex = (int)i;
+            game->scene.selectedObject = nullptr;
+        }
+        ImGui::PopID();
+    }
 
     for (size_t i = 0; i < game->scene.objects.size(); i++) {
         Object* obj = game->scene.objects[i];
@@ -108,7 +133,10 @@ void Editor::SceneGUI() {
                 renaming = false;
             }
         } else {
-            if (ImGui::Selectable(obj->name.c_str(), selected)) game->scene.selectedObject = obj;
+            if (ImGui::Selectable(obj->name.c_str(), selected)) {
+                game->scene.selectedObject = obj;
+                game->scene.selectedLightIndex = -1; // clear any light selection
+            }
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                 renaming = true;
         }
@@ -122,11 +150,25 @@ void Editor::SceneGUI() {
             if (ImGui::MenuItem("Sphere")) game->scene.addObject("Sphere", "Sphere_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Plane")) game->scene.addObject("Plane", "Plane_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Pyramid")) game->scene.addObject("Pyramid", "Pyramid_" + std::to_string(objectCount++));
+            if(ImGui::BeginMenu("Light")) {
+                if(ImGui::MenuItem("Point Light")) {
+                    Light dirLight(LightType::Point, Vec3d(0,0,0), 1.0f);
+                }
+                if(ImGui::MenuItem("Directional Light")) {
+                    Light dirLight(LightType::Directional, Vec3d(0,0,0), 1.0f);
+                }
+                ImGui::EndMenu();
+            }
             ImGui::EndMenu();
         }
-        if (game->scene.selectedObject && ImGui::MenuItem("Delete Object")) {
-            game->scene.removeObject(game->scene.selectedObject);
-            game->scene.selectedObject = nullptr;
+        if ((game->scene.selectedObject || game->scene.selectedLightIndex != -1) && ImGui::MenuItem("Delete Object")) {
+            if(game->scene.selectedObject) {
+                game->scene.removeObject(game->scene.selectedObject);
+                game->scene.selectedObject = nullptr;
+            } else {
+                game->scene.removeLight(game->scene.selectedLightIndex);
+                game->scene.selectedLightIndex = -1;
+            }
         }
         ImGui::EndPopup();
     }

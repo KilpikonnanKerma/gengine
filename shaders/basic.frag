@@ -21,6 +21,8 @@ uniform int numPointLights;
 
 uniform sampler2D uTexture;
 uniform bool useTexture;
+uniform vec3 overrideColor;
+uniform int useOverrideColor;
 
 in vec3 FragPos;
 in vec3 Color;
@@ -39,6 +41,11 @@ void main() {
         baseColor = texture(uTexture, TexCoord).rgb; 
     } else {
         baseColor = Color;
+    }
+
+    // If an override color is requested, use it as the base color (ignores textures and vertex colors)
+    if (useOverrideColor == 1) {
+        baseColor = overrideColor;
     }
 
     // Directional lights

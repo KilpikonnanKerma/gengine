@@ -3,18 +3,21 @@
 
 #include <vector>
 #include <GL/gl.h>
-#include <glm/glm.hpp>
 #include <GL/glext.h>
 
 #include <stb_image.h>
 
 #include <iostream>
 
+#include "nsm/math.hpp"
+
+using namespace NMATH;
+
 struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec3 normal;
-    glm::vec2 texCoord;
+    Vec3d pos;
+    Vec3d color;
+    Vec3d normal;
+    Vec2d texCoord;
 };
 
 class ShapeGenerator {

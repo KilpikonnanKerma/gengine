@@ -3,17 +3,19 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_mouse.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+
+#include "nsm/math.hpp"
 
 #include "imgui.h"
+
+using namespace NMATH;
 
 class EditorInput {
 
 public:
-    glm::vec3 cameraPos;
-    glm::vec3 cameraFront;
-    glm::vec3 cameraUp;
+    Vec3d cameraPos;
+    Vec3d cameraFront;
+    Vec3d cameraUp;
 
     float yaw;
     float pitch;
@@ -21,6 +23,7 @@ public:
     float sensitivity;
 
     bool leftMouseClicked = false;
+    bool leftMouseHeld = false;
     float mouseX = 0, mouseY = 0;
 
     bool rightMouseHeld = false;

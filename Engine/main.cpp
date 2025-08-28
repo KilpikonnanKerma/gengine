@@ -3,9 +3,7 @@
 #include <SDL3/SDL.h>
 #include <iostream>
 #include "glad/glad.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include "nsm/math.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -19,6 +17,8 @@
 #include "util/shapegen.hpp"
 
 #include "GameMain.hpp"
+
+using namespace NMATH;
 
 int main(int argc, char* argv[]) {
 
@@ -88,7 +88,8 @@ int main(int argc, char* argv[]) {
     } else {
         editor = new Editor(window, &game, editorWidth);
         game.scene.initGrid(50, 1.f);
-        game.scene.initGizmo();   
+    game.scene.initGizmo();
+    game.scene.initLightGizmo();
     }
 
     while (running) {
@@ -145,16 +146,16 @@ int main(int argc, char* argv[]) {
         glClearColor(0.1f, 0.0f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 view = glm::lookAt(inputHandler.cameraPos,
+        Mat4 view = lookAt(inputHandler.cameraPos,
                                     inputHandler.cameraPos + inputHandler.cameraFront,
                                     inputHandler.cameraUp);
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f),
+        Mat4 projection = perspective(radians(45.0f),
                                                 (float)viewportWidth / (float)viewportHeight,
                                                 0.1f, 100.0f);
 
         glUseProgram(shaderProgram);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, view.value_ptr());
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, projection.value_ptr());
 
         if (inputHandler.leftMouseClicked && !ImGui::GetIO().WantCaptureMouse) {
             const int mx = inputHandler.mouseX;
@@ -174,21 +175,71 @@ int main(int argc, char* argv[]) {
                 float ndcX =  (2.0f * vx) / viewportWidth  - 1.0f;
                 float ndcY = 1.0f - (2.0f * vy) / viewportHeight;
 
-                glm::vec4 rayClip(ndcX, ndcY, -1.0f, 1.0f);
-                glm::vec4 rayClipFar(ndcX, ndcY, 1.0f, 1.0f);
+                Vec4d rayClip(ndcX, ndcY, -1.0f, 1.0f);
+                Vec4d rayClipFar(ndcX, ndcY, 1.0f, 1.0f);
 
-                glm::mat4 invVP = glm::inverse(projection * view);
-                glm::vec4 rayStart = invVP * rayClip; rayStart /= rayStart.w;
-                glm::vec4 rayEnd   = invVP * rayClipFar; rayEnd /= rayEnd.w;
+                Mat4 invVP = (projection * view).inverse();
+                Vec4d rayStart = invVP * rayClip; rayStart /= rayStart.w;
+                Vec4d rayEnd   = invVP * rayClipFar; rayEnd /= rayEnd.w;
 
-                glm::vec3 rayOrigin = glm::vec3(rayStart);
-                glm::vec3 rayDir = glm::normalize(glm::vec3(rayEnd - rayStart));
+                Vec3d rayOrigin = Vec3d(rayStart);
+                Vec3d rayDir = Vec3d(rayEnd - rayStart).normalized();
 
-                if(game.scene.pickGizmoAxis(inputHandler.cameraPos, rayDir, game.scene.grabbedAxis)) {
+                if(game.scene.pickGizmoAxis(rayOrigin, rayDir, game.scene.grabbedAxis)) {
                     game.scene.axisGrabbed = true;
+                    game.scene.objectDrag = false;
+                    // picking gizmo implies an object is selected; clear light selection
+                    game.scene.selectedLightIndex = -1;
                 } else {
-                    game.scene.selectedObject = game.scene.pickObject(inputHandler.cameraPos, rayDir);
+                    // Object pick (free drag)
+                    game.scene.selectedObject = game.scene.pickObject(rayOrigin, rayDir);
                     game.scene.axisGrabbed = false;
+                    if (game.scene.selectedObject) {
+                        // clear light selection when selecting an object
+                        game.scene.selectedLightIndex = -1;
+                        // create a drag plane perpendicular to camera front at the object's position
+                        game.scene.objectDrag = true;
+                        game.scene.dragPlaneNormal = inputHandler.cameraFront.normalized();
+                        // intersect ray with plane (plane at object's current position)
+                        Vec3d planePoint = game.scene.selectedObject->position;
+                        // plane: (p - planePoint) dot N = 0
+                        float denom = rayDir.dot(game.scene.dragPlaneNormal);
+                        if (fabs(denom) > 1e-6f) {
+                            float t = (planePoint - rayOrigin).dot(game.scene.dragPlaneNormal) / denom;
+                            Vec3d hitPoint = rayOrigin + rayDir * t;
+                            game.scene.dragInitialPoint = hitPoint;
+                            game.scene.dragInitialObjPos = game.scene.selectedObject->position;
+                        } else {
+                            game.scene.dragInitialPoint = game.scene.selectedObject->position;
+                            game.scene.dragInitialObjPos = game.scene.selectedObject->position;
+                        }
+            } else {
+                        // try picking a light
+                        int lightIdx = -1;
+                        if (game.scene.pickLight(rayOrigin, rayDir, lightIdx, 0.6f)) {
+                game.scene.selectedLightIndex = lightIdx;
+                // clear object selection when a light is selected
+                game.scene.selectedObject = nullptr;
+                            game.scene.objectDrag = true; // reuse plane drag for lights
+                            game.scene.dragPlaneNormal = inputHandler.cameraFront.normalized();
+                            Vec3d planePoint = game.scene.lights[lightIdx].position;
+                            float denom = rayDir.dot(game.scene.dragPlaneNormal);
+                            if (fabs(denom) > 1e-6f) {
+                                float t = (planePoint - rayOrigin).dot(game.scene.dragPlaneNormal) / denom;
+                                Vec3d hitPoint = rayOrigin + rayDir * t;
+                                game.scene.dragInitialPoint = hitPoint;
+                                game.scene.dragInitialObjPos = game.scene.lights[lightIdx].position;
+                            } else {
+                                game.scene.dragInitialPoint = game.scene.lights[lightIdx].position;
+                                game.scene.dragInitialObjPos = game.scene.lights[lightIdx].position;
+                            }
+                        } else {
+                            // clicked empty space: deselect both object and light
+                            game.scene.objectDrag = false;
+                            game.scene.selectedLightIndex = -1;
+                            game.scene.selectedObject = nullptr;
+                        }
+                    }
                 }
 
                 // game.scene.selectedObject = game.scene.pickObject(rayOrigin, rayDir);
@@ -198,17 +249,44 @@ int main(int argc, char* argv[]) {
         }
 
         if(game.scene.axisGrabbed){
-            int winW, winH;
-            SDL_GetWindowSize(window, &winW, &winH);
-            float x = (2.0f * inputHandler.mouseX) / winW - 1.0f;
-            float y = 1.0f - (2.0f * inputHandler.mouseY) / winH;
-            glm::vec4 ray_clip = glm::vec4(x,y,-1.0,1.0);
-            glm::mat4 invVP = glm::inverse(projection * view);
-            glm::vec4 ray_world = invVP * ray_clip;
-            ray_world /= ray_world.w;
-            glm::vec3 ray_dir = glm::normalize(glm::vec3(ray_world) - inputHandler.cameraPos);
+            float vx = (float)inputHandler.mouseX - viewportX;
+            float vy = (float)inputHandler.mouseY - viewportY;
 
-            game.scene.dragSelectedObject(inputHandler.cameraPos, ray_dir);
+            // If mouse is outside the viewport, skip dragging
+                if (vx < 0 || vx > viewportWidth || vy < 0 || vy > viewportHeight) {
+            } else {
+                float ndcX = (2.0f * vx) / viewportWidth - 1.0f;
+                float ndcY = 1.0f - (2.0f * vy) / viewportHeight;
+
+                Vec4d rayClipNear(ndcX, ndcY, -1.0f, 1.0f);
+                Vec4d rayClipFar(ndcX, ndcY, 1.0f, 1.0f);
+                Mat4 invVP = (projection * view).inverse();
+                Vec4d nearWorld = invVP * rayClipNear; nearWorld /= nearWorld.w;
+                Vec4d farWorld  = invVP * rayClipFar;  farWorld  /= farWorld.w;
+
+                Vec3d rayOriginDrag = Vec3d(nearWorld);
+                Vec3d rayDirDrag = Vec3d(farWorld - nearWorld).normalized();
+
+                if (game.scene.objectDrag && game.scene.selectedObject) {
+                    // intersect ray with drag plane
+                    Vec3d N = game.scene.dragPlaneNormal;
+                    Vec3d planeP = game.scene.dragInitialPoint;
+                    float denom = rayDirDrag.dot(N);
+                    if (fabs(denom) > 1e-6f) {
+                        float t = (planeP - rayOriginDrag).dot(N) / denom;
+                        Vec3d hit = rayOriginDrag + rayDirDrag * t;
+                        Vec3d delta = hit - game.scene.dragInitialPoint;
+                        Vec3d newPos = game.scene.dragInitialObjPos + delta;
+                        if (game.scene.selectedObject) {
+                            game.scene.selectedObject->position = newPos;
+                        } else if (game.scene.selectedLightIndex >= 0) {
+                            game.scene.lights[game.scene.selectedLightIndex].position = newPos;
+                        }
+                    }
+                } else {
+                    game.scene.dragSelectedObject(rayOriginDrag, rayDirDrag);
+                }
+            }
         }
 
         game.scene.render(shaderProgram, view, projection);

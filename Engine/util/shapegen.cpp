@@ -3,7 +3,7 @@
 void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
     float h = size / 2.0f;
 
-    glm::vec3 facePositions[6][4] = {
+    Vec3d facePositions[6][4] = {
         {{-h,-h,-h},{h,-h,-h},{h,h,-h},{-h,h,-h}}, // back
         {{-h,-h,h},{h,-h,h},{h,h,h},{-h,h,h}},     // front
         {{-h,-h,-h},{-h,h,-h},{-h,h,h},{-h,-h,h}}, // left
@@ -12,18 +12,18 @@ void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, st
         {{-h,-h,-h},{h,-h,-h},{h,-h,h},{-h,-h,h}}  // bottom
     };
 
-    glm::vec3 normals[6] = {
+    Vec3d normals[6] = {
         {0,0,-1}, {0,0,1}, {-1,0,0}, {1,0,0}, {0,1,0}, {0,-1,0}
     };
 
-    glm::vec2 uvs[4] = {
+    Vec2d uvs[4] = {
         {0.0f, 0.0f},
         {1.0f, 0.0f},
         {1.0f, 1.0f},
         {0.0f, 1.0f}
     };
 
-    glm::vec3 color = {1,1,1};
+    Vec3d color = {1,1,1};
 
     for(int f=0; f<6; f++){
         unsigned int startIndex = outVertices.size();
@@ -45,19 +45,19 @@ void ShapeGenerator::createPlane(float width, float height, std::vector<Vertex>&
     float w = width / 2.0f;
     float h = height / 2.0f;
 
-    glm::vec3 positions[4] = {
+    Vec3d positions[4] = {
         {-w, 0, -h}, {w, 0, -h}, {w, 0, h}, {-w, 0, h}
     };
 
-    glm::vec2 uvs[4] = {
+    Vec2d uvs[4] = {
         {0.0f, 0.0f},
         {1.0f, 0.0f},
         {1.0f, 1.0f},
         {0.0f, 1.0f}
     };
 
-    glm::vec3 normal = {0,1,0};
-    glm::vec3 color = {1,1,1};
+    Vec3d normal = {0,1,0};
+    Vec3d color = {1,1,1};
 
     unsigned int startIndex = outVertices.size();
     for(int i=0;i<4;i++)
@@ -74,17 +74,17 @@ void ShapeGenerator::createPlane(float width, float height, std::vector<Vertex>&
 
 void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
     float h = size / 2.0f;
-    glm::vec3 top = {0,height/2.0f,0};
+    Vec3d top = {0,height/2.0f,0};
 
-    glm::vec3 base[4] = {
+    Vec3d base[4] = {
         {-h,-height/2.0f,-h}, {h,-height/2.0f,-h}, {h,-height/2.0f,h}, {-h,-height/2.0f,h}
     };
 
-    glm::vec2 baseUVs[4] = {
+    Vec2d baseUVs[4] = {
         {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}
     };
 
-    glm::vec3 color = {1,1,1};
+    Vec3d color = {1,1,1};
 
     // base
     unsigned int startIndex = outVertices.size();
@@ -101,14 +101,14 @@ void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>
     // sides
     for(int i=0;i<4;i++){
         unsigned int idx = outVertices.size();
-        glm::vec3 next = base[(i+1)%4];
-        glm::vec2 uv0 = {0.0f, 0.0f};
-        glm::vec2 uv1 = {1.0f, 0.0f};
-        glm::vec2 uv2 = {0.5f, 1.0f};
+        Vec3d next = base[(i+1)%4];
+        Vec2d uv0 = {0.0f, 0.0f};
+        Vec2d uv1 = {1.0f, 0.0f};
+        Vec2d uv2 = {0.5f, 1.0f};
 
-        glm::vec3 edge1 = next - base[i];
-        glm::vec3 edge2 = top - base[i];
-        glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+        Vec3d edge1 = next - base[i];
+        Vec3d edge2 = top - base[i];
+        Vec3d normal = edge1.cross(edge2).normalized();
 
         outVertices.push_back({base[i], color, normal, uv0});
         outVertices.push_back({next,   color, normal, uv1});
@@ -121,18 +121,18 @@ void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>
 }
 
 void ShapeGenerator::createSphere(float radius, int segments, int rings, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
-    glm::vec3 color = {1,1,1};
+    Vec3d color = {1,1,1};
     for(int y=0;y<=rings;y++){
         for(int x=0;x<=segments;x++){
             float xSegment = (float)x / segments;
             float ySegment = (float)y / rings;
-            float xPos = radius * cos(xSegment * 2.0f * M_PI) * sin(ySegment * M_PI);
-            float yPos = radius * cos(ySegment * M_PI);
-            float zPos = radius * sin(xSegment * 2.0f * M_PI) * sin(ySegment * M_PI);
+            float xPos = radius * cos(xSegment * 2.0f * PI) * sin(ySegment * PI);
+            float yPos = radius * cos(ySegment * PI);
+            float zPos = radius * sin(xSegment * 2.0f * PI) * sin(ySegment * PI);
 
-            glm::vec3 pos = {xPos,yPos,zPos};
-            glm::vec3 normal = glm::normalize(pos);
-            glm::vec2 texCoord = {xSegment, ySegment};
+            Vec3d pos = {xPos,yPos,zPos};
+            Vec3d normal = pos.normalized();
+            Vec2d texCoord = {xSegment, ySegment};
 
             outVertices.push_back({pos,color,normal,texCoord});
         }

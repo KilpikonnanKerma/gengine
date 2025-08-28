@@ -6,12 +6,15 @@
 #include "glad/glad.h"
 #include "util/shapegen.hpp"
 
+#include "nsm/math.hpp"
+using namespace NMATH;
+
 class Object {
 public:
-    glm::vec3 position;
-    glm::vec3 rotation;             // Euler angles
+    Vec3d position;
+    Vec3d rotation;             // Euler angles
     std::string type;
-    glm::vec3 scale;
+    Vec3d scale;
     std::string name;
 
     unsigned int VAO, VBO, EBO;
@@ -28,7 +31,7 @@ public:
     void initPyramid(float size, float height);
 
     void setupMesh();
-    glm::mat4 getModelMatrix() const;
+    Mat4 getModelMatrix() const;
 
     void texture(const std::string& path);
     void draw() const;

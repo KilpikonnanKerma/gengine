@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(SDL3 REQUIRED)
 find_package(OpenGL REQUIRED)
 
-include_directories(include source shaders)
+include_directories(include include/nsmlib/ source shaders)
 
 file(GLOB ENGINE_SOURCES "Engine/*.cpp" "Engine/*.c" "Engine/util/*.cpp" "source/*.cpp")
 
@@ -27,5 +27,5 @@ file(COPY textures DESTINATION ${CMAKE_BINARY_DIR})
 
 target_compile_definitions(GENGINE PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
-target_include_directories(GENGINE PRIVATE include source shaders include/imgui include/imgui/backends)
+target_include_directories(GENGINE PRIVATE include source shaders include/imgui include/nsmlib include/imgui/backends)
 target_link_libraries(GENGINE PRIVATE SDL3::SDL3 OpenGL::GL)

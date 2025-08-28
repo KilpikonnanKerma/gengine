@@ -3,9 +3,9 @@
 #include "Engine/object.hpp"
 
 Object::Object() {
-    position = glm::vec3(0.0f);
-    rotation = glm::vec3(0.0f);
-    scale    = glm::vec3(1.0f);
+    position = Vec3d(0.0f);
+    rotation = Vec3d(0.0f);
+    scale    = Vec3d(1.0f);
     name = "Unnamed object";
 }
 
@@ -59,15 +59,16 @@ void Object::setupMesh() {
     glEnableVertexAttribArray(3);
 }
 
-glm::mat4 Object::getModelMatrix() const {
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, position);
-    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1,0,0));
-    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0,1,0));
-    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0,0,1));
-    model = glm::scale(model, scale);
+Mat4 Object::getModelMatrix() const {
+    Mat4 model = Mat4::identity();
+    model = translate(model, position);
+    model = rotate(model, radians(rotation.x), {1,0,0});
+    model = rotate(model, radians(rotation.y), {0,1,0});
+    model = rotate(model, radians(rotation.z), {0,0,1});
+    model = NMATH::scale(model, scale);
     return model;
 }
+
 
 void Object::texture(const std::string& path) {
     texturePath = path;
@@ -99,5 +100,5 @@ void Object::draw() const {
 }
 
 float Object::boundingRadius() const {
-    return glm::length(scale); // or a fixed value, or calculate from mesh
+    return scale.length(); // or a fixed value, or calculate from mesh
 }

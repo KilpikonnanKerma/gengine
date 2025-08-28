@@ -1,5 +1,6 @@
 #include "Engine/sceneManager.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <iostream>
 #include <glm/gtx/intersect.hpp>
 
 void SceneManager::clearScene() {
@@ -11,78 +12,158 @@ void SceneManager::clearScene() {
 }
 
 static void initMeshForType(Object* obj, const std::string& type) {
-    if (type == "Cube")       obj->initCube(1.0f);
-    else if (type == "Sphere")obj->initSphere(0.5f, 16, 16);
-    else if (type == "Plane") obj->initPlane(5.0f, 5.0f);
+    if (type == "Cube")         obj->initCube(1.0f);
+    else if (type == "Sphere")  obj->initSphere(0.5f, 16, 16);
+    else if (type == "Plane")   obj->initPlane(5.0f, 5.0f);
     else if (type == "Pyramid") obj->initPyramid(1.0f, 1.0f);
-    else                      obj->initCube(1.0f);
+    else                        obj->initCube(1.0f);
 }
 
-glm::vec3 closestPointOnLine(const glm::vec3& rayOrigin, const glm::vec3& rayDir,
-                             const glm::vec3& linePoint, const glm::vec3& lineDir)
+Vec3d closestPointOnLine(const Vec3d& rayOrigin, const Vec3d& rayDir,
+                             const Vec3d& linePoint, const Vec3d& lineDir)
 {
-    glm::vec3 w0 = rayOrigin - linePoint;
-    float a = glm::dot(lineDir, lineDir);
-    float b = glm::dot(lineDir, rayDir);
-    float c = glm::dot(rayDir, rayDir);
-    float d = glm::dot(lineDir, w0);
-    float e = glm::dot(rayDir, w0);
+    // Solve for closest point on 'line' (point=linePoint + lineDir * s) to the ray (origin + rayDir * t)
+    Vec3d w0 = rayOrigin - linePoint;
+    float a = lineDir.dot(lineDir);           // |u|^2
+    float b = lineDir.dot(rayDir);            // u.v
+    float c = rayDir.dot(rayDir);             // |v|^2
+    float d = lineDir.dot(w0);                // u.(w0)
+    float e = rayDir.dot(w0);                 // v.(w0)
 
-    float denom = a*c - b*b;
-    float sc = (b*e - c*d) / denom;
+    float denom = a * c - b * b;
+    const float EPS = 1e-8f;
+    float s;
+    if (fabs(denom) < EPS) {
+        // Lines are almost parallel — pick projection of ray origin onto the line
+        if (a < EPS) {
+            // degenerate lineDir
+            return linePoint;
+        }
+        s = d / a; // projection of w0 onto u
+    } else {
+        s = (b * e - c * d) / denom;
+    }
 
-    return linePoint + lineDir * sc;
+    return linePoint + lineDir * s;
 }
 
 void SceneManager::initGizmo() {
     // 3 lines: X, Y, Z axes
-    std::vector<glm::vec3> gizmoVertices = {
+    std::vector<Vec3d> gizmoVertices = {
         {0,0,0}, {1,0,0},   // X
         {0,0,0}, {0,1,0},   // Y
         {0,0,0}, {0,0,1}    // Z
     };
+
+    if (!selectedObject) {
+        if (objects.empty()) return;
+        selectedObject = objects[0];
+    }
 
     glGenVertexArrays(1, &axisVAO);
     glGenBuffers(1, &axisVBO);
 
     glBindVertexArray(axisVAO);
     glBindBuffer(GL_ARRAY_BUFFER, axisVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3)*gizmoVertices.size(), gizmoVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec3d)*gizmoVertices.size(), gizmoVertices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(glm::vec3),(void*)0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vec3d),(void*)0);
 
     glBindVertexArray(0);
 }
 
-void SceneManager::drawGizmo(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
-    if(!selectedObject) return;
+void SceneManager::initLightGizmo() {
+    // simple single-point gizmo (we use GL_POINTS) - one vertex at origin, will be translated per-light
+    Vec3d v = {0,0,0};
+    glGenVertexArrays(1, &lightVAO);
+    glGenBuffers(1, &lightVBO);
 
-    glm::vec3 pos = selectedObject->position;
+    glBindVertexArray(lightVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec3d), &v, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vec3d),(void*)0);
+    glBindVertexArray(0);
+}
 
-    std::vector<GizmoAxis> axes = {
-        {{0,0,0},{1,0,0},{1,0,0},{1,0,0}}, // X red
-        {{0,0,0},{0,1,0},{0,1,0},{0,1,0}}, // Y green
-        {{0,0,0},{0,0,1},{0,0,1},{0,0,1}}  // Z blue
-    };
 
-    glBindVertexArray(axisVAO);
-    for(auto& axis : axes){
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), pos);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE,glm::value_ptr(model));
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"view"),1,GL_FALSE,glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"projection"),1,GL_FALSE,glm::value_ptr(projection));
-        glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&axis.color[0]);
+void SceneManager::drawGizmo(GLuint shaderProgram, const Mat4& view, const Mat4& projection) {
+    // Draw object gizmo axes only when an object is selected
+    if (selectedObject) {
+        Vec3d pos = selectedObject->position;
 
-        glDrawArrays(GL_LINES,0,2);
+        std::vector<GizmoAxis> axes = {
+            {{0,0,0},{1,0,0},{1,0,0},{1,0,0}}, // X red
+            {{0,0,0},{0,1,0},{0,1,0},{0,1,0}}, // Y green
+            {{0,0,0},{0,0,1},{0,0,1},{0,0,1}}  // Z blue
+        };
+
+        glBindVertexArray(axisVAO);
+        glLineWidth(2.0f);
+        for (size_t i = 0; i < axes.size(); ++i) {
+            const auto& axis = axes[i];
+            Mat4 model = translate(Mat4(1.0f), pos);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"view"),1,GL_FALSE, view.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"projection"),1,GL_FALSE, projection.value_ptr());
+            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
+            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&axis.color[0]);
+
+            glDrawArrays(GL_LINES, (GLint)(i * 2), 2);
+        }
+        // restore override flag and GL state
+        glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 0);
+        glLineWidth(1.0f);
+        glBindVertexArray(0);
     }
-    glBindVertexArray(0);
+
+    // Draw light gizmos (always draw, even if no object is selected)
+    if (lightVAO != 0) {
+        glBindVertexArray(lightVAO);
+        glPointSize(10.0f);
+        for (size_t i = 0; i < lights.size(); ++i) {
+            Mat4 model = translate(Mat4(1.0f), lights[i].position);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&lights[i].color[0]);
+            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
+            if ((int)i == selectedLightIndex) {
+                // brighter / bigger
+                glPointSize(14.0f);
+            }
+            glDrawArrays(GL_POINTS, 0, 1);
+            if ((int)i == selectedLightIndex) glPointSize(10.0f);
+        }
+        glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 0);
+        glPointSize(1.0f);
+        glBindVertexArray(0);
+    }
 }
 
-bool SceneManager::pickGizmoAxis(const glm::vec3& rayOrigin, const glm::vec3& rayDir, GizmoAxis& outAxis) {
-    if(!selectedObject) return false;
+bool SceneManager::pickLight(const Vec3d& rayOrigin, const Vec3d& rayDir, int& outIndex, float radius) {
+    float closestT = FLT_MAX;
+    int idx = -1;
+    Vec3d dir = rayDir.normalized();
+    for (size_t i = 0; i < lights.size(); ++i) {
+        const Light& L = lights[i];
+        float t = 0.0f;
+        if (intersectRaySphere(rayOrigin, dir, L.position, radius * radius, t)) {
+            if (t >= 0.0f && t < closestT) {
+                closestT = t;
+                idx = (int)i;
+            }
+        }
+    }
+    if (idx >= 0) {
+        outIndex = idx;
+        return true;
+    }
+    return false;
+}
 
-    glm::vec3 pos = selectedObject->position;
+bool SceneManager::pickGizmoAxis(const Vec3d& rayOrigin, const Vec3d& rayDir, GizmoAxis& outAxis) {
+    if (!selectedObject) return false;
+    Vec3d pos = selectedObject->position;
     std::vector<GizmoAxis> axes = {
         {{0,0,0},{1,0,0},{1,0,0},{1,0,0}}, // X
         {{0,0,0},{0,1,0},{0,1,0},{0,1,0}}, // Y
@@ -92,29 +173,79 @@ bool SceneManager::pickGizmoAxis(const glm::vec3& rayOrigin, const glm::vec3& ra
     float closestDist = FLT_MAX;
     bool hit = false;
     for(auto& axis : axes){
-        glm::vec3 p1 = pos + axis.start;
-        glm::vec3 p2 = pos + axis.end;
-        glm::vec3 closest;
-        float t;
-        closest = closestPointOnLine(rayOrigin, rayDir, p1, p2 - p1);
-        float dist = glm::length(closest - rayOrigin);
-        if(dist < axisGrabDistance && dist < closestDist){
-            closestDist = dist;
-            outAxis = axis;
+        Vec3d p1 = pos + axis.start;
+        Vec3d p2 = pos + axis.end;
+        Vec3d lineDir = (p2 - p1);
+        float segLen = lineDir.length();
+        if (segLen <= 1e-6f) continue;
+        Vec3d lineDirNorm = lineDir / segLen;
+
+        // Closest point on infinite line
+        Vec3d closest = closestPointOnLine(rayOrigin, rayDir, p1, lineDir);
+
+        // Project closest onto the segment parameter t in [0, segLen]
+        float t = (closest - p1).dot(lineDirNorm);
+        if (t < 0.0f) t = 0.0f;
+        if (t > segLen) t = segLen;
+
+        Vec3d clamped = p1 + lineDirNorm * t;
+
+        // Distance from the ray to the clamped point (perpendicular distance)
+        Vec3d rayDirNorm = rayDir.normalized();
+        Vec3d v = clamped - rayOrigin;
+        float along = v.dot(rayDirNorm);
+        Vec3d closestOnRay = rayOrigin + rayDirNorm * along;
+        float perpDist = (clamped - closestOnRay).length();
+
+        // slightly increase grab distance for easier picking
+        float grabThreshold = axisGrabDistance * 3.0f;
+        if(perpDist < grabThreshold && perpDist < closestDist){
+            closestDist = perpDist;
+            // return axis with full segment vector in dir (world space) and world-space endpoints
+            GizmoAxis worldAxis = axis;
+            worldAxis.start = p1; // world-space
+            worldAxis.end = p2;   // world-space
+            worldAxis.dir = (p2 - p1); // full segment vector in world space
+            // record initial projection along axis and object's position at pick time
+            worldAxis.initialProj = t;
+            worldAxis.initialObjPos = selectedObject ? selectedObject->position : Vec3d(0.0f);
+            outAxis = worldAxis;
             hit = true;
         }
     }
     return hit;
 }
 
-void SceneManager::dragSelectedObject(const glm::vec3& rayOrigin, const glm::vec3& rayDir){
+void SceneManager::dragSelectedObject(const Vec3d& rayOrigin, const Vec3d& rayDir){
     if(!axisGrabbed || !selectedObject) return;
 
-    glm::vec3 pos = selectedObject->position;
-    glm::vec3 closest;
-    float t;
-    closest = closestPointOnLine(rayOrigin, rayDir, pos, grabbedAxis.dir);
-    selectedObject->position = closest; // snap exactly along axis
+    // Use the grabbed axis endpoints recorded at pick time (world-space)
+    Vec3d start = grabbedAxis.start;
+    Vec3d end = grabbedAxis.end;
+    Vec3d axisDir = grabbedAxis.dir;
+    float len = axisDir.length();
+    if (len < 1e-6f) return;
+    Vec3d axisDirNorm = axisDir / len;
+
+    // Compute closest point on the full axis segment's infinite line
+    Vec3d closest = closestPointOnLine(rayOrigin, rayDir, start, axisDir);
+
+    // Compute projected distance along axis from start (in world units)
+    float closestProj = (closest - start).dot(axisDirNorm);
+
+    // Use the projection captured at pick time so dragging is relative to where the user grabbed
+    float initial = grabbedAxis.initialProj;
+    Vec3d basePos = grabbedAxis.initialObjPos;
+
+    float delta = closestProj - initial;
+
+    // small deadzone to avoid jitter when mouse barely moves
+    const float DEADZONE = 1e-4f;
+    if (fabs(delta) < DEADZONE) delta = 0.0f;
+
+    Vec3d newPos = basePos - axisDirNorm * delta;
+
+    selectedObject->position = newPos;
 }
 
 Object* SceneManager::addObject(const std::string& type, const std::string& name) {
@@ -135,13 +266,21 @@ void SceneManager::removeObject(Object* objPtr) {
     delete objPtr;
 }
 
+void SceneManager::removeLight(int index) {
+    if (index >= 0 && index < (int)lights.size()) {
+        lights.erase(lights.begin() + index);
+    }
+}
+
 void SceneManager::addLight(const Light& light){
     lights.push_back(light);
+    // ensure gizmo resources exist when lights are present
+    if (lightVAO == 0) initLightGizmo();
 }
 
 void SceneManager::update(float deltaTime) {}
 
-void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
+void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& projection) {
     glUseProgram(shaderProgram);
 
     int dirCount=0, pointCount=0;
@@ -167,12 +306,13 @@ void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm
     unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
     unsigned int viewLoc  = glGetUniformLocation(shaderProgram, "view");
     unsigned int projLoc  = glGetUniformLocation(shaderProgram, "projection");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view.value_ptr());
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection.value_ptr());
 
+    // Draw scene objects
     for (auto* obj : objects) {
-        glm::mat4 model = obj->getModelMatrix();
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        Mat4 model = obj->getModelMatrix();
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model.value_ptr());
 
         if (obj->textureID != 0) {
             glActiveTexture(GL_TEXTURE0);
@@ -183,36 +323,92 @@ void SceneManager::render(GLuint shaderProgram, const glm::mat4& view, const glm
             glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 0);
         }
 
+        // ensure override is off for normal object draw
+        glUniform1i(glGetUniformLocation(shaderProgram, "useOverrideColor"), 0);
+
         glBindVertexArray(obj->VAO);
         glDrawElements(GL_TRIANGLES, (GLsizei)obj->indices.size(), GL_UNSIGNED_INT, 0);
 
         if (obj == selectedObject) {
+            // Draw outline overlay for selected object
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glLineWidth(5.0f);
 
             glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 0);
-            glUniform3f(glGetUniformLocation(shaderProgram, "overrideColor"), 0.0f, 0.0f, 0.0f); // black
+            glUniform3f(glGetUniformLocation(shaderProgram, "overrideColor"), 0.0f, 0.0f, 0.0f);
+            glUniform1i(glGetUniformLocation(shaderProgram, "useOverrideColor"), 1);
 
             glDrawElements(GL_TRIANGLES, (GLsizei)obj->indices.size(), GL_UNSIGNED_INT, 0);
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             glLineWidth(1.0f);
         }
+
+        glBindVertexArray(0);
+    }
+
+    // Draw object gizmo axes only when an object is selected
+    if (selectedObject) {
+        Vec3d pos = selectedObject->position;
+
+        std::vector<GizmoAxis> axes = {
+            {{0,0,0},{1,0,0},{1,0,0},{1,0,0}}, // X red
+            {{0,0,0},{0,1,0},{0,1,0},{0,1,0}}, // Y green
+            {{0,0,0},{0,0,1},{0,0,1},{0,0,1}}  // Z blue
+        };
+
+        glBindVertexArray(axisVAO);
+        glLineWidth(2.0f);
+        for (size_t i = 0; i < axes.size(); ++i) {
+            const auto& axis = axes[i];
+            Mat4 model = translate(Mat4(1.0f), pos);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"view"),1,GL_FALSE, view.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"projection"),1,GL_FALSE, projection.value_ptr());
+            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
+            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&axis.color[0]);
+
+            glDrawArrays(GL_LINES, (GLint)(i * 2), 2);
+        }
+        // restore override flag and GL state
+        glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 0);
+        glLineWidth(1.0f);
+        glBindVertexArray(0);
+    }
+
+    // Draw light gizmos (always draw, even if no object is selected)
+    if (lightVAO != 0) {
+        glBindVertexArray(lightVAO);
+        glPointSize(10.0f);
+        for (size_t i = 0; i < lights.size(); ++i) {
+            Mat4 model = translate(Mat4(1.0f), lights[i].position);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&lights[i].color[0]);
+            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
+            if ((int)i == selectedLightIndex) {
+                // brighter / bigger
+                glPointSize(14.0f);
+            }
+            glDrawArrays(GL_POINTS, 0, 1);
+            if ((int)i == selectedLightIndex) glPointSize(10.0f);
+        }
+        glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 0);
+        glPointSize(1.0f);
+        glBindVertexArray(0);
     }
 }
-
-Object* SceneManager::pickObject(const glm::vec3& rayOrigin, const glm::vec3& rayDir) {
+Object* SceneManager::pickObject(const Vec3d& rayOrigin, const Vec3d& rayDir) {
     float minDist = FLT_MAX;
     Object* picked = nullptr;
 
-    glm::vec3 dir = glm::normalize(rayDir);
+    Vec3d dir = rayDir.normalized();
 
     for (auto* obj : objects) {
-        const glm::vec3 center = obj->position;
+        const Vec3d center = obj->position;
         const float radius = obj->boundingRadius();
         float t = 0.0f;
 
-        if (glm::intersectRaySphere(rayOrigin, dir, center, radius * radius, t)) {
+        if (intersectRaySphere(rayOrigin, dir, center, radius * radius, t)) {
             if (t >= 0.0f && t < minDist) {
                 minDist = t;
                 picked = obj;
@@ -224,14 +420,14 @@ Object* SceneManager::pickObject(const glm::vec3& rayOrigin, const glm::vec3& ra
 
 
 void SceneManager::initGrid(int gridSize, float spacing) {
-    std::vector<glm::vec3> gridVertices;
+    std::vector<Vec3d> gridVertices;
 
     for (int i = -gridSize; i <= gridSize; i++) {
-        gridVertices.push_back(glm::vec3(i * spacing, 0.0f, -gridSize * spacing));
-        gridVertices.push_back(glm::vec3(i * spacing, 0.0f,  gridSize * spacing));
+        gridVertices.push_back(Vec3d(i * spacing, 0.0f, -gridSize * spacing));
+        gridVertices.push_back(Vec3d(i * spacing, 0.0f,  gridSize * spacing));
 
-        gridVertices.push_back(glm::vec3(-gridSize * spacing, 0.0f, i * spacing));
-        gridVertices.push_back(glm::vec3( gridSize * spacing, 0.0f, i * spacing));
+        gridVertices.push_back(Vec3d(-gridSize * spacing, 0.0f, i * spacing));
+        gridVertices.push_back(Vec3d( gridSize * spacing, 0.0f, i * spacing));
     }
 
     gridVertexCount = gridVertices.size();
@@ -241,22 +437,22 @@ void SceneManager::initGrid(int gridSize, float spacing) {
 
     glBindVertexArray(gridVAO);
     glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
-    glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * sizeof(glm::vec3),
+    glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * sizeof(Vec3d),
                  gridVertices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3d), (void*)0);
 
     glBindVertexArray(0);
 }
 
-void SceneManager::drawGrid(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
+void SceneManager::drawGrid(GLuint shaderProgram, const Mat4& view, const Mat4& projection) {
     if (gridVAO == 0) return;
 
-    glm::mat4 model = glm::mat4(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    Mat4 model = Mat4(1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, model.value_ptr());
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, view.value_ptr());
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, projection.value_ptr());
 
     glBindVertexArray(gridVAO);
     glDrawArrays(GL_LINES, 0, gridVertexCount);
@@ -312,15 +508,15 @@ void SceneManager::loadScene(const std::string& path) {
         std::string type = objJson.value("type", "Cube");
         std::string name = objJson.value("name", type);
 
-        glm::vec3 pos(0.0f), rot(0.0f), scl(1.0f);
+        Vec3d pos(0.0f), rot(0.0f), scl(1.0f);
         if (objJson.contains("position") && objJson["position"].size() == 3) {
-            pos = glm::vec3(objJson["position"][0], objJson["position"][1], objJson["position"][2]);
+            pos = Vec3d(objJson["position"][0], objJson["position"][1], objJson["position"][2]);
         }
         if (objJson.contains("rotation") && objJson["rotation"].size() == 3) {
-            rot = glm::vec3(objJson["rotation"][0], objJson["rotation"][1], objJson["rotation"][2]);
+            rot = Vec3d(objJson["rotation"][0], objJson["rotation"][1], objJson["rotation"][2]);
         }
         if (objJson.contains("scale") && objJson["scale"].size() == 3) {
-            scl = glm::vec3(objJson["scale"][0], objJson["scale"][1], objJson["scale"][2]);
+            scl = Vec3d(objJson["scale"][0], objJson["scale"][1], objJson["scale"][2]);
         }
         std::string texPath = objJson.value("texturePath", "");
 

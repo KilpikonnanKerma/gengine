@@ -1,7 +1,6 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include <glm/glm.hpp>
 #include <vector>
 #include "glad/glad.h"
 #include "util/shapegen.hpp"

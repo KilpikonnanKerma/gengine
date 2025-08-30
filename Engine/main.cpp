@@ -1,14 +1,22 @@
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#define NOGDI
+#define NOOPENGL
+#endif
+
 #define STB_IMAGE_IMPLEMENTATION
 
-#include <SDL3/SDL.h>
-#include <iostream>
 #include "glad/glad.h"
-#include "nsm/math.hpp"
+#include <SDL3/SDL.h>
 
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
+
+#include <iostream>
+#include "nsm/math.hpp"
 
 #include "shaderc.hpp"
 #include "input.hpp"
@@ -29,7 +37,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL could not initialize! " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -87,9 +97,9 @@ int main(int argc, char* argv[]) {
         game.Start();
     } else {
         editor = new Editor(window, &game, editorWidth);
-        game.scene.initGrid(50, 1.f);
-    game.scene.initGizmo();
-    game.scene.initLightGizmo();
+        game.scene->initGrid(50, 1.f);
+    game.scene->initGizmo();
+    game.scene->initLightGizmo();
     }
 
     while (running) {
@@ -185,59 +195,59 @@ int main(int argc, char* argv[]) {
                 Vec3d rayOrigin = Vec3d(rayStart);
                 Vec3d rayDir = Vec3d(rayEnd - rayStart).normalized();
 
-                if(game.scene.pickGizmoAxis(rayOrigin, rayDir, game.scene.grabbedAxis)) {
-                    game.scene.axisGrabbed = true;
-                    game.scene.objectDrag = false;
+                if(game.scene->pickGizmoAxis(rayOrigin, rayDir, game.scene->grabbedAxis)) {
+                    game.scene->axisGrabbed = true;
+                    game.scene->objectDrag = false;
                     // picking gizmo implies an object is selected; clear light selection
-                    game.scene.selectedLightIndex = -1;
+                    game.scene->selectedLightIndex = -1;
                 } else {
                     // Object pick (free drag)
-                    game.scene.selectedObject = game.scene.pickObject(rayOrigin, rayDir);
-                    game.scene.axisGrabbed = false;
-                    if (game.scene.selectedObject) {
+                    game.scene->selectedObject = game.scene->pickObject(rayOrigin, rayDir);
+                    game.scene->axisGrabbed = false;
+                    if (game.scene->selectedObject) {
                         // clear light selection when selecting an object
-                        game.scene.selectedLightIndex = -1;
+                        game.scene->selectedLightIndex = -1;
                         // create a drag plane perpendicular to camera front at the object's position
-                        game.scene.objectDrag = true;
-                        game.scene.dragPlaneNormal = inputHandler.cameraFront.normalized();
+                        game.scene->objectDrag = true;
+                        game.scene->dragPlaneNormal = inputHandler.cameraFront.normalized();
                         // intersect ray with plane (plane at object's current position)
-                        Vec3d planePoint = game.scene.selectedObject->position;
+                        Vec3d planePoint = game.scene->selectedObject->position;
                         // plane: (p - planePoint) dot N = 0
-                        float denom = rayDir.dot(game.scene.dragPlaneNormal);
+                        float denom = rayDir.dot(game.scene->dragPlaneNormal);
                         if (fabs(denom) > 1e-6f) {
-                            float t = (planePoint - rayOrigin).dot(game.scene.dragPlaneNormal) / denom;
+                            float t = (planePoint - rayOrigin).dot(game.scene->dragPlaneNormal) / denom;
                             Vec3d hitPoint = rayOrigin + rayDir * t;
-                            game.scene.dragInitialPoint = hitPoint;
-                            game.scene.dragInitialObjPos = game.scene.selectedObject->position;
+                            game.scene->dragInitialPoint = hitPoint;
+                            game.scene->dragInitialObjPos = game.scene->selectedObject->position;
                         } else {
-                            game.scene.dragInitialPoint = game.scene.selectedObject->position;
-                            game.scene.dragInitialObjPos = game.scene.selectedObject->position;
+                            game.scene->dragInitialPoint = game.scene->selectedObject->position;
+                            game.scene->dragInitialObjPos = game.scene->selectedObject->position;
                         }
             } else {
                         // try picking a light
                         int lightIdx = -1;
-                        if (game.scene.pickLight(rayOrigin, rayDir, lightIdx, 0.6f)) {
-                game.scene.selectedLightIndex = lightIdx;
+                        if (game.scene->pickLight(rayOrigin, rayDir, lightIdx, 0.6f)) {
+                game.scene->selectedLightIndex = lightIdx;
                 // clear object selection when a light is selected
-                game.scene.selectedObject = nullptr;
-                            game.scene.objectDrag = true; // reuse plane drag for lights
-                            game.scene.dragPlaneNormal = inputHandler.cameraFront.normalized();
-                            Vec3d planePoint = game.scene.lights[lightIdx].position;
-                            float denom = rayDir.dot(game.scene.dragPlaneNormal);
+                game.scene->selectedObject = nullptr;
+                            game.scene->objectDrag = true; // reuse plane drag for lights
+                            game.scene->dragPlaneNormal = inputHandler.cameraFront.normalized();
+                            Vec3d planePoint = game.scene->lights[lightIdx].position;
+                            float denom = rayDir.dot(game.scene->dragPlaneNormal);
                             if (fabs(denom) > 1e-6f) {
-                                float t = (planePoint - rayOrigin).dot(game.scene.dragPlaneNormal) / denom;
+                                float t = (planePoint - rayOrigin).dot(game.scene->dragPlaneNormal) / denom;
                                 Vec3d hitPoint = rayOrigin + rayDir * t;
-                                game.scene.dragInitialPoint = hitPoint;
-                                game.scene.dragInitialObjPos = game.scene.lights[lightIdx].position;
+                                game.scene->dragInitialPoint = hitPoint;
+                                game.scene->dragInitialObjPos = game.scene->lights[lightIdx].position;
                             } else {
-                                game.scene.dragInitialPoint = game.scene.lights[lightIdx].position;
-                                game.scene.dragInitialObjPos = game.scene.lights[lightIdx].position;
+                                game.scene->dragInitialPoint = game.scene->lights[lightIdx].position;
+                                game.scene->dragInitialObjPos = game.scene->lights[lightIdx].position;
                             }
                         } else {
                             // clicked empty space: deselect both object and light
-                            game.scene.objectDrag = false;
-                            game.scene.selectedLightIndex = -1;
-                            game.scene.selectedObject = nullptr;
+                            game.scene->objectDrag = false;
+                            game.scene->selectedLightIndex = -1;
+                            game.scene->selectedObject = nullptr;
                         }
                     }
                 }
@@ -248,7 +258,7 @@ int main(int argc, char* argv[]) {
             inputHandler.leftMouseClicked = false;
         }
 
-        if(game.scene.axisGrabbed){
+        if(game.scene->axisGrabbed){
             float vx = (float)inputHandler.mouseX - viewportX;
             float vy = (float)inputHandler.mouseY - viewportY;
 
@@ -267,34 +277,34 @@ int main(int argc, char* argv[]) {
                 Vec3d rayOriginDrag = Vec3d(nearWorld);
                 Vec3d rayDirDrag = Vec3d(farWorld - nearWorld).normalized();
 
-                if (game.scene.objectDrag && game.scene.selectedObject) {
+                if (game.scene->objectDrag && game.scene->selectedObject) {
                     // intersect ray with drag plane
-                    Vec3d N = game.scene.dragPlaneNormal;
-                    Vec3d planeP = game.scene.dragInitialPoint;
+                    Vec3d N = game.scene->dragPlaneNormal;
+                    Vec3d planeP = game.scene->dragInitialPoint;
                     float denom = rayDirDrag.dot(N);
                     if (fabs(denom) > 1e-6f) {
                         float t = (planeP - rayOriginDrag).dot(N) / denom;
                         Vec3d hit = rayOriginDrag + rayDirDrag * t;
-                        Vec3d delta = hit - game.scene.dragInitialPoint;
-                        Vec3d newPos = game.scene.dragInitialObjPos + delta;
-                        if (game.scene.selectedObject) {
-                            game.scene.selectedObject->position = newPos;
-                        } else if (game.scene.selectedLightIndex >= 0) {
-                            game.scene.lights[game.scene.selectedLightIndex].position = newPos;
+                        Vec3d delta = hit - game.scene->dragInitialPoint;
+                        Vec3d newPos = game.scene->dragInitialObjPos + delta;
+                        if (game.scene->selectedObject) {
+                            game.scene->selectedObject->position = newPos;
+                        } else if (game.scene->selectedLightIndex >= 0) {
+                            game.scene->lights[game.scene->selectedLightIndex].position = newPos;
                         }
                     }
                 } else {
-                    game.scene.dragSelectedObject(rayOriginDrag, rayDirDrag);
+                    game.scene->dragSelectedObject(rayOriginDrag, rayDirDrag);
                 }
             }
         }
 
-        game.scene.render(shaderProgram, view, projection);
+        game.scene->render(shaderProgram, view, projection);
 
         if(!game_mode) {
-            game.scene.drawGrid(shaderProgram, view, projection);
+            game.scene->drawGrid(shaderProgram, view, projection);
             glDisable(GL_DEPTH_TEST);
-            game.scene.drawGizmo(shaderProgram, view, projection);
+            game.scene->drawGizmo(shaderProgram, view, projection);
             glEnable(GL_DEPTH_TEST);
         }
 

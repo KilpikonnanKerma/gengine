@@ -4,7 +4,7 @@
 #include "Engine/object.hpp"
 #include "Engine/light.hpp"
 
-#include <GL/gl.h>
+#include "glad/glad.h"
 
 #include <cfloat>
 #include <string>
@@ -23,6 +23,10 @@ struct GizmoAxis {
     Vec3d end;
     Vec3d color;
     Vec3d dir;
+
+	GizmoAxis(const Vec3d& s, const Vec3d& e, const Vec3d& c, const Vec3d& d)
+		: start(s), end(e), color(c), dir(d) {}
+
     // State captured at pick time to make dragging stable
     float initialProj = 0.0f;
     Vec3d initialObjPos = Vec3d(0.0f);

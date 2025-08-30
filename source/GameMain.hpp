@@ -12,7 +12,7 @@ public:
     void Start();
     void Update(float dt);
 
-    SceneManager scene;
+    SceneManager* scene;
 
     Object* floor;
     Object* cube1;

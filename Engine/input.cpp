@@ -71,9 +71,9 @@ void EditorInput::processMouse(SDL_Event& e) {
         if(pitch < -89.0f) pitch = -89.0f;
 
         Vec3d front;
-        front.x = cos(radians(yaw)) * cos(radians(pitch));
-        front.y = sin(radians(pitch));
-        front.z = sin(radians(yaw)) * cos(radians(pitch));
+        front.x = NMATH::cos(radians(yaw)) * NMATH::cos(radians(pitch));
+        front.y = NMATH::sin(radians(pitch));
+        front.z = NMATH::sin(radians(yaw)) * NMATH::cos(radians(pitch));
         cameraFront = front.normalized();
     }
 }

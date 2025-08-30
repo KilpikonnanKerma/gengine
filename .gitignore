@@ -1,2 +1,7 @@
 build/*
 .vscode/
+
+# visual studio crap
+.vs/
+Debug/
+Release/

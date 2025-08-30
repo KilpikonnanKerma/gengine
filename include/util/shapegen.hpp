@@ -2,7 +2,7 @@
 #define SHAPEGEN_H
 
 #include <vector>
-#include <GL/gl.h>
+#include "glad/glad.h"
 #include <GL/glext.h>
 
 #include <stb_image.h>

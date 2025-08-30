@@ -1,7 +1,5 @@
 #include "Engine/sceneManager.hpp"
-#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
-#include <glm/gtx/intersect.hpp>
 
 void SceneManager::clearScene() {
     for (auto* o : objects) {
@@ -499,23 +497,23 @@ void SceneManager::loadScene(const std::string& path) {
 
     clearScene();
 
-    if (!j.contains("objects") || !j["objects"].is_array()) {
-        std::cerr << "[loadScene] No 'objects' array in scene\n";
-        return;
-    }
+	if (j.find("objects") == j.end() || !j["objects"].is_array()) {
+		std::cerr << "[loadScene] No 'objects' array in scene\n";
+		return;
+	}
 
     for (const auto& objJson : j["objects"]) {
         std::string type = objJson.value("type", "Cube");
         std::string name = objJson.value("name", type);
 
         Vec3d pos(0.0f), rot(0.0f), scl(1.0f);
-        if (objJson.contains("position") && objJson["position"].size() == 3) {
+        if (objJson.find("position") != objJson.end() && objJson["position"].size() == 3) {
             pos = Vec3d(objJson["position"][0], objJson["position"][1], objJson["position"][2]);
         }
-        if (objJson.contains("rotation") && objJson["rotation"].size() == 3) {
+        if (objJson.find("rotation") != objJson.end() && objJson["rotation"].size() == 3) {
             rot = Vec3d(objJson["rotation"][0], objJson["rotation"][1], objJson["rotation"][2]);
         }
-        if (objJson.contains("scale") && objJson["scale"].size() == 3) {
+        if (objJson.find("scale") != objJson.end() && objJson["scale"].size() == 3) {
             scl = Vec3d(objJson["scale"][0], objJson["scale"][1], objJson["scale"][2]);
         }
         std::string texPath = objJson.value("texturePath", "");

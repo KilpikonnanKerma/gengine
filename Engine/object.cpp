@@ -1,5 +1,4 @@
 #include "Engine/object.hpp"
-#include <glm/gtc/matrix_transform.hpp>
 #include "Engine/object.hpp"
 
 Object::Object() {
@@ -88,7 +87,7 @@ void Object::texture(const std::string& path) {
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     } else {
-        std::cerr << "Failed to load texture: " << path << std::endl;
+        std::cerr << "Failed to load texture: " << path.c_str() << std::endl;
         std::cerr << "stbi_failure_reason: " << stbi_failure_reason() << std::endl;
     }
     stbi_image_free(data);

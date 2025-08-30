@@ -126,9 +126,9 @@ void ShapeGenerator::createSphere(float radius, int segments, int rings, std::ve
         for(int x=0;x<=segments;x++){
             float xSegment = (float)x / segments;
             float ySegment = (float)y / rings;
-            float xPos = radius * cos(xSegment * 2.0f * PI) * sin(ySegment * PI);
-            float yPos = radius * cos(ySegment * PI);
-            float zPos = radius * sin(xSegment * 2.0f * PI) * sin(ySegment * PI);
+            float xPos = radius * NMATH::cos(xSegment * 2.0f * PI) * NMATH::sin(ySegment * PI);
+            float yPos = radius * NMATH::cos(ySegment * PI);
+            float zPos = radius * NMATH::sin(xSegment * 2.0f * PI) * NMATH::sin(ySegment * PI);
 
             Vec3d pos = {xPos,yPos,zPos};
             Vec3d normal = pos.normalized();

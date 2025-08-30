@@ -1,5 +1,4 @@
 #include "Engine/editor.hpp"
-namespace fs = std::filesystem;
 
 Editor::Editor(SDL_Window* w, GameMain* g, float& width)
     : window(w), game(g), editorWidth(width) {
@@ -63,7 +62,7 @@ void Editor::EditorGUI() {
     int wW, wH; SDL_GetWindowSize(window, &wW, &wH);
     ImGui::Begin("Editor", nullptr, ImGuiWindowFlags_NoCollapse);
 
-    Object* obj = game->scene.selectedObject;
+    Object* obj = game->scene->selectedObject;
     if (obj) {
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             pos[0]=obj->position.x; pos[1]=obj->position.y; pos[2]=obj->position.z;
@@ -87,8 +86,8 @@ void Editor::EditorGUI() {
             if (obj->textureID) ImGui::Image((void*)(intptr_t)obj->textureID, ImVec2(128,128));
         }
     } 
-    if (game->scene.selectedLightIndex >= 0) {
-        Light& l = game->scene.lights[game->scene.selectedLightIndex];
+    if (game->scene->selectedLightIndex >= 0) {
+        Light& l = game->scene->lights[game->scene->selectedLightIndex];
         float pos[3] = { l.position.x, l.position.y, l.position.z };
         float col[3] = { l.color.x, l.color.y, l.color.z };
         float intensity = l.intensity;
@@ -109,21 +108,21 @@ void Editor::EditorGUI() {
 void Editor::SceneGUI() {
     ImGui::Begin("Scene");
 
-    for (size_t i = 0; i < game->scene.lights.size(); ++i) {
-        Light& l = game->scene.lights[i];
+    for (size_t i = 0; i < game->scene->lights.size(); ++i) {
+        Light& l = game->scene->lights[i];
         ImGui::PushID((int)(1000 + i));
-        bool selected = (game->scene.selectedLightIndex == (int)i);
+        bool selected = (game->scene->selectedLightIndex == (int)i);
         if (ImGui::Selectable(std::string("Light_" + std::to_string(i)).c_str(), selected)) {
-            game->scene.selectedLightIndex = (int)i;
-            game->scene.selectedObject = nullptr;
+            game->scene->selectedLightIndex = (int)i;
+            game->scene->selectedObject = nullptr;
         }
         ImGui::PopID();
     }
 
-    for (size_t i = 0; i < game->scene.objects.size(); i++) {
-        Object* obj = game->scene.objects[i];
+    for (size_t i = 0; i < game->scene->objects.size(); i++) {
+        Object* obj = game->scene->objects[i];
         ImGui::PushID((int)i);
-        bool selected = (game->scene.selectedObject == obj);
+        bool selected = (game->scene->selectedObject == obj);
 
         if (selected && renaming) {
             strcpy(nameBuffer, obj->name.c_str());
@@ -134,8 +133,8 @@ void Editor::SceneGUI() {
             }
         } else {
             if (ImGui::Selectable(obj->name.c_str(), selected)) {
-                game->scene.selectedObject = obj;
-                game->scene.selectedLightIndex = -1; // clear any light selection
+                game->scene->selectedObject = obj;
+                game->scene->selectedLightIndex = -1; // clear any light selection
             }
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                 renaming = true;
@@ -146,10 +145,10 @@ void Editor::SceneGUI() {
 
     if (ImGui::BeginPopupContextWindow("SceneContextMenu", ImGuiPopupFlags_MouseButtonRight)) {
         if (ImGui::BeginMenu("New Object")) {
-            if (ImGui::MenuItem("Cube")) game->scene.addObject("Cube", "Cube_" + std::to_string(objectCount++));
-            if (ImGui::MenuItem("Sphere")) game->scene.addObject("Sphere", "Sphere_" + std::to_string(objectCount++));
-            if (ImGui::MenuItem("Plane")) game->scene.addObject("Plane", "Plane_" + std::to_string(objectCount++));
-            if (ImGui::MenuItem("Pyramid")) game->scene.addObject("Pyramid", "Pyramid_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Cube")) game->scene->addObject("Cube", "Cube_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Sphere")) game->scene->addObject("Sphere", "Sphere_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Plane")) game->scene->addObject("Plane", "Plane_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Pyramid")) game->scene->addObject("Pyramid", "Pyramid_" + std::to_string(objectCount++));
             if(ImGui::BeginMenu("Light")) {
                 if(ImGui::MenuItem("Point Light")) {
                     Light dirLight(LightType::Point, Vec3d(0,0,0), 1.0f);
@@ -161,13 +160,13 @@ void Editor::SceneGUI() {
             }
             ImGui::EndMenu();
         }
-        if ((game->scene.selectedObject || game->scene.selectedLightIndex != -1) && ImGui::MenuItem("Delete Object")) {
-            if(game->scene.selectedObject) {
-                game->scene.removeObject(game->scene.selectedObject);
-                game->scene.selectedObject = nullptr;
+        if ((game->scene->selectedObject || game->scene->selectedLightIndex != -1) && ImGui::MenuItem("Delete Object")) {
+            if(game->scene->selectedObject) {
+                game->scene->removeObject(game->scene->selectedObject);
+                game->scene->selectedObject = nullptr;
             } else {
-                game->scene.removeLight(game->scene.selectedLightIndex);
-                game->scene.selectedLightIndex = -1;
+                game->scene->removeLight(game->scene->selectedLightIndex);
+                game->scene->selectedLightIndex = -1;
             }
         }
         ImGui::EndPopup();
@@ -212,7 +211,7 @@ void Editor::ProjectGUI() {
             std::string name = entry.path().filename().string();
 
             // Tree node
-            ImGuiTreeNodeFlags node_flags = ((selectedFolder == entry.path()) ? ImGuiTreeNodeFlags_Selected : 0);
+            ImGuiTreeNodeFlags node_flags = ((selectedFolder == entry.path().string()) ? ImGuiTreeNodeFlags_Selected : 0);
             bool node_open = ImGui::TreeNodeEx(name.c_str(), node_flags);
             if (ImGui::IsItemClicked()) selectedFolder = entry.path();
             if (node_open) {
@@ -296,8 +295,8 @@ void Editor::ProjectGUI() {
 
 
 void Editor::SaveScene() { 
-    game->scene.saveScene(currentProjectPath+"/scene.gscene");
+    game->scene->saveScene(currentProjectPath+"/scene.gscene");
 }
 void Editor::LoadScene() {
-    game->scene.loadScene(currentProjectPath+"/scene.gscene");
+    game->scene->loadScene(currentProjectPath+"/scene.gscene");
 }

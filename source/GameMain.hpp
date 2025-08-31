@@ -4,10 +4,10 @@
 #include <Engine/game.hpp>
 #include <Engine/sceneManager.hpp>
 
-class GameMain : Game {
+class GameMain : public Game {
 public:
-
     GameMain();
+    ~GameMain();
 
     void Start();
     void Update(float dt);

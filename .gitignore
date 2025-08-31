@@ -5,3 +5,9 @@ build/*
 .vs/
 Debug/
 Release/
+obj/
+*.vcxproj.*
+*.vcxproj
+*.sln
+*.suo
+*.sdf

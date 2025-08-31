@@ -24,6 +24,10 @@ struct GizmoAxis {
     Vec3d color;
     Vec3d dir;
 
+    // Default constructor so SceneManager can be default-constructed
+    GizmoAxis()
+        : start(Vec3d(0.0)), end(Vec3d(0.0)), color(Vec3d(0.0)), dir(Vec3d(0.0)) {}
+
 	GizmoAxis(const Vec3d& s, const Vec3d& e, const Vec3d& c, const Vec3d& d)
 		: start(s), end(e), color(c), dir(d) {}
 
@@ -34,24 +38,28 @@ struct GizmoAxis {
 
 class SceneManager {
 public:
+    SceneManager();
     std::vector<Object*> objects;
     std::vector<Light> lights;
 
-    Object* selectedObject = nullptr;
+    Object* selectedObject;
     
     GizmoAxis grabbedAxis;
-    bool axisGrabbed = false;
-    bool objectDrag = false;
-    Vec3d dragPlaneNormal = Vec3d(0.0f);
-    Vec3d dragInitialPoint = Vec3d(0.0f);
-    Vec3d dragInitialObjPos = Vec3d(0.0f);
-    float axisGrabDistance = 0.12f;
+    bool axisGrabbed;
+    bool objectDrag;
+    Vec3d dragPlaneNormal;
+    Vec3d dragInitialPoint;
+    Vec3d dragInitialObjPos;
+    float axisGrabDistance;
+
+    // Width in pixels for gizmo axis lines
+    float gizmoLineWidth;
 
     GLuint axisVAO, axisVBO;
-    GLuint lightVAO = 0, lightVBO = 0;
-    int selectedLightIndex = -1;
+    GLuint lightVAO, lightVBO;
+    int selectedLightIndex;
 
-    int objCounter = 0;
+    int objCounter;
 
     void clearScene();
 

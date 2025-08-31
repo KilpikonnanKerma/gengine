@@ -1,8 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_mouse.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mouse.h>
 
 #include "nsm/math.hpp"
 
@@ -22,17 +22,27 @@ public:
     float speed;
     float sensitivity;
 
-    bool leftMouseClicked = false;
-    bool leftMouseHeld = false;
-    float mouseX = 0, mouseY = 0;
+    bool leftMouseClicked;
+    bool leftMouseHeld;
+    int mouseX, mouseY;
 
-    bool rightMouseHeld = false;
+    bool rightMouseHeld;
 
     EditorInput(SDL_Window* window);
     void processKeyboard(float deltaTime);
 
     void handleEvent(SDL_Event& e, SDL_Window* window);
     void processMouse(SDL_Event& e);
+
+    // Handle clicks/drags/camera while interacting with the editor viewport.
+    // This moves the previous main.cpp input handling into input.cpp.
+    // viewportX/Y/W/H are in window coordinates.
+    void handleViewportInput(class Editor* editor, class GameMain& game,
+                             const Mat4& view, const Mat4& projection,
+                             int viewportX, int viewportY, int viewportW, int viewportH);
+
+    // Internal state used for edge detection when processing viewport mouse
+    bool prevViewportMouseDown;
 };
 
 #endif

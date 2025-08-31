@@ -1,8 +1,15 @@
 #include "Engine/editor.hpp"
 
 Editor::Editor(SDL_Window* w, GameMain* g, float& width)
-    : window(w), game(g), editorWidth(width) {
-
+    : window(w), game(g), editorWidth(width), viewportTexture(0), viewportTexW(0), viewportTexH(0),
+      viewportHovered(false), viewportMouseU(0.0f), viewportMouseV(0.0f), viewportMouseDown(false),
+      currentProjectPath(""), selectedFile(""), objectCount(0), renaming(false), scale(1.0f)
+{
+    // initialize arrays
+    pos[0]=pos[1]=pos[2]=0.0f;
+    rot[0]=rot[1]=rot[2]=0.0f;
+    texPath[0] = '\0';
+    nameBuffer[0] = '\0';
 }
 
 Editor::~Editor() {}
@@ -33,6 +40,45 @@ void Editor::Update() {
     ProjectGUI();
 
     ImGui::End();
+
+    ImGui::Begin("Viewport");
+    if (viewportTexture != 0) {
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        float aspect = (viewportTexW > 0 && viewportTexH > 0) ? (float)viewportTexW / (float)viewportTexH : (16.0f/9.0f);
+        float width = avail.x;
+        float height = width / aspect;
+        if (height > avail.y) { height = avail.y; width = height * aspect; }
+            ImVec2 uv0 = ImVec2(0.0f, 1.0f);
+            ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+            ImGui::Image((ImTextureID)(intptr_t)viewportTexture, ImVec2(width, height), uv0, uv1);
+
+            ImGuiIO& io = ImGui::GetIO();
+            ImVec2 imgMin = ImGui::GetItemRectMin();
+            ImVec2 imgMax = ImGui::GetItemRectMax();
+            ImVec2 mousePos = io.MousePos;
+            // Check hover
+            viewportHovered = (mousePos.x >= imgMin.x && mousePos.x <= imgMax.x && mousePos.y >= imgMin.y && mousePos.y <= imgMax.y);
+            if (viewportHovered) {
+                float localX = mousePos.x - imgMin.x;
+                float localY = mousePos.y - imgMin.y;
+                float w = imgMax.x - imgMin.x;
+                float h = imgMax.y - imgMin.y;
+                viewportMouseU = localX / w;
+                viewportMouseV = 1.0f - (localY / h);
+                viewportMouseDown = ImGui::IsMouseDown(0);
+            } else {
+                viewportMouseDown = false;
+            }
+    } else {
+        ImGui::Text("No viewport texture available");
+    }
+    ImGui::End();
+}
+
+void Editor::setViewportTexture(GLuint tex, int w, int h) {
+    viewportTexture = tex;
+    viewportTexW = w;
+    viewportTexH = h;
 }
 
 void Editor::MainMenu() {
@@ -208,27 +254,27 @@ void Editor::ProjectGUI() {
     std::function<void(const fs::path&)> drawTree = [&](const fs::path& dir) {
         for (auto& entry : fs::directory_iterator(dir)) {
             if (!entry.is_directory()) continue;
-            std::string name = entry.path().filename().string();
+            std::string name = entry.getpath().filename().string();
 
             // Tree node
-            ImGuiTreeNodeFlags node_flags = ((selectedFolder == entry.path().string()) ? ImGuiTreeNodeFlags_Selected : 0);
+            ImGuiTreeNodeFlags node_flags = ((selectedFolder == entry.getpath().string()) ? ImGuiTreeNodeFlags_Selected : 0);
             bool node_open = ImGui::TreeNodeEx(name.c_str(), node_flags);
-            if (ImGui::IsItemClicked()) selectedFolder = entry.path();
+            if (ImGui::IsItemClicked()) selectedFolder = entry.getpath();
             if (node_open) {
-                drawTree(entry.path());
+                drawTree(entry.getpath());
                 ImGui::TreePop();
             }
 
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("New Folder")) {
-                    fs::create_directory(entry.path() / "NewFolder");
+                    fs::create_directory(entry.getpath() / "NewFolder");
                 }
                 if (ImGui::MenuItem("New C++ Class")) {
                     std::string className = "NewClass";
-                    std::ofstream header(entry.path() / (className + ".hpp"));
+                    std::ofstream header(entry.getpath() / (className + ".hpp"));
                     header << "#pragma once\n\nclass " << className << " {};\n";
                     header.close();
-                    std::ofstream source(entry.path() / (className + ".cpp"));
+                    std::ofstream source(entry.getpath() / (className + ".cpp"));
                     source << "#include \"" << className << ".hpp\"\n";
                     source.close();
                 }
@@ -257,15 +303,15 @@ void Editor::ProjectGUI() {
 
     if (!selectedFolder.empty() && fs::exists(selectedFolder)) {
         for (auto& entry : fs::directory_iterator(selectedFolder)) {
-            std::string name = entry.path().filename().string();
+            std::string name = entry.getpath().filename().string();
             bool isDir = entry.is_directory();
 
             if (isDir) ImGui::TextDisabled("[Folder] %s", name.c_str());
-            else ImGui::Selectable(name.c_str(), selectedFile == entry.path().string());
+            else ImGui::Selectable(name.c_str(), selectedFile == entry.getpath().string());
 
             if (ImGui::BeginDragDropSource()) {
-                ImGui::SetDragDropPayload("DND_FILE", entry.path().string().c_str(),
-                                           entry.path().string().size() + 1);
+                ImGui::SetDragDropPayload("DND_FILE", entry.getpath().string().c_str(),
+                                           entry.getpath().string().size() + 1);
                 ImGui::Text("%s", name.c_str());
                 ImGui::EndDragDropSource();
             }
@@ -273,15 +319,15 @@ void Editor::ProjectGUI() {
             if (isDir && ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DND_FILE")) {
                     const char* srcPath = (const char*)payload->Data;
-                    fs::path dest = entry.path() / fs::path(srcPath).filename();
-                    try { fs::rename(srcPath, dest); } 
+                    fs::path dest = entry.getpath() / fs::path(srcPath).filename();
+                    try { fs::rename(srcPath, dest); }
                     catch (std::exception& e) { std::cerr << "Error moving file: " << e.what() << std::endl; }
                 }
                 ImGui::EndDragDropTarget();
             }
 
             if (!isDir && ImGui::BeginPopupContextItem()) {
-                if (ImGui::MenuItem("Delete File")) fs::remove(entry.path());
+                if (ImGui::MenuItem("Delete File")) fs::remove(entry.getpath());
                 ImGui::EndPopup();
             }
         }

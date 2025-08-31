@@ -1,6 +1,8 @@
 #include "GameMain.hpp"
 
 GameMain::GameMain() {
+    scene = new SceneManager();
+
     Light dirLight(LightType::Directional, Vec3d(1,1,1), 1.0f);
     dirLight.direction = Vec3d(-0.2f,-1.0f,-0.3f);
     scene->addLight(dirLight);
@@ -21,4 +23,8 @@ void GameMain::Start() {
 
 void GameMain::Update(float dt) {
     cube1->rotation.y += 30.f * dt;
+}
+
+GameMain::~GameMain() {
+    delete scene;
 }

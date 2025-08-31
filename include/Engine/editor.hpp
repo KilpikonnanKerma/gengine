@@ -1,7 +1,7 @@
 #ifndef EDITOR_HPP
 #define EDITOR_HPP
 
-#include <SDL3/SDL.h>
+#include "SDL2/SDL.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "Engine/sceneManager.hpp"
@@ -19,6 +19,12 @@ public:
 
     void Update();
 
+    void setViewportTexture(GLuint tex, int w, int h);
+
+    bool isViewportHovered() const { return viewportHovered; }
+    void getViewportMouseUV(float& u, float& v) const { u = viewportMouseU; v = viewportMouseV; }
+    bool isViewportMouseDown() const { return viewportMouseDown; }
+
 private:
     void MainMenu();
     void EditorGUI();
@@ -32,20 +38,27 @@ private:
     GameMain* game;
     float editorWidth;
 
-    std::string currentProjectPath = "";
-    std::string selectedFile = "";
+    GLuint viewportTexture;
+    int viewportTexW;
+    int viewportTexH;
+
+    bool viewportHovered;
+    float viewportMouseU;
+    float viewportMouseV;
+    bool viewportMouseDown;
+
+    std::string currentProjectPath;
+    std::string selectedFile;
     std::vector<std::string> projectFiles;
 
-    // Scene GUI state
-    int objectCount = 0;
-    bool renaming = false;
+    int objectCount;
+    bool renaming;
     char nameBuffer[128];
 
-    // Editor GUI state
-    float pos[3]{0,0,0};
-    float rot[3]{0,0,0};
-    float scale = 1.0f;
-    char texPath[256]{""};
+    float pos[3];
+    float rot[3];
+    float scale;
+    char texPath[256];
 };
 
 #endif

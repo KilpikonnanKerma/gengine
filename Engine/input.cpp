@@ -68,6 +68,13 @@ void EditorInput::processMouse(SDL_Event& e) {
         float xpos = (float)e.motion.xrel;
         float ypos = (float)e.motion.yrel;
 
+        // Only process mouse movement if it exceeds a small threshold
+        // This prevents spurious camera drift from tiny mouse movements
+        const float movementThreshold = 1.0f;
+        if (absf(xpos) < movementThreshold && absf(ypos) < movementThreshold) {
+            return;
+        }
+
         yaw   += xpos * sensitivity;
         pitch -= ypos * sensitivity;
 

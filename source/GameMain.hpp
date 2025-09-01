@@ -2,7 +2,7 @@
 #define GAME_MAIN_HPP
 
 #include <Engine/game.hpp>
-#include <Engine/sceneManager.hpp>
+#include "Player.hpp"
 
 class GameMain : public Game {
 public:
@@ -13,6 +13,7 @@ public:
     void Update(float dt);
 
     SceneManager* scene;
+    Player* player;
 
     Object* floor;
     Object* cube1;

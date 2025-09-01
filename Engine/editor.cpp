@@ -10,13 +10,15 @@ Editor::Editor(SDL_Window* w, GameMain* g, float& width)
     rot[0]=rot[1]=rot[2]=0.0f;
     texPath[0] = '\0';
     nameBuffer[0] = '\0';
+
+    glShaderType = 0;
 }
 
 Editor::~Editor() {}
 
 void Editor::Update() {
     int wW, wH; SDL_GetWindowSize(window, &wW, &wH);
-
+    
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y+15), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, viewport->Size.y-15));
@@ -41,7 +43,67 @@ void Editor::Update() {
 
     ImGui::End();
 
-    ImGui::Begin("Viewport");
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("Viewport", NULL, ImGuiWindowFlags_NoCollapse);
+    ImGui::PopStyleVar();
+
+    ImGui::BeginChild("SceneToolbar", ImVec2(0, 28), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    {
+        if (ImGui::Button("Play")) {
+            std::string tmpScene;
+            if (currentProjectPath.empty()) {
+                char cwd[4096];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) tmpScene = std::string(cwd) + "/tmp_play_scene.gscene";
+                else tmpScene = std::string("./tmp_play_scene.gscene");
+            } else {
+                tmpScene = currentProjectPath + std::string("/tmp_play_scene.gscene");
+            }
+            game->scene->saveScene(tmpScene);
+            printf("[Editor] Saved play-scene to '%s'\n", tmpScene.c_str());
+
+            // Candidate executable names (prefer installed/packaged name first)
+            const char* candidates[] = {"GENGINE", "gengine", "gengine-player", "./GENGINE", "./gengine", NULL};
+            std::string exePath;
+            char* base = SDL_GetBasePath();
+            if (base) {
+                for (int i = 0; candidates[i]; ++i) {
+                    std::string cand = std::string(base) + candidates[i];
+                    if (fs::exists(cand)) { exePath = cand; break; }
+                }
+                SDL_free(base);
+            }
+            if (exePath.empty()) {
+                for (int i = 0; candidates[i]; ++i) {
+                    std::string cand = std::string(candidates[i]);
+                    if (fs::exists(cand)) { exePath = cand; break; }
+                }
+            }
+            if (exePath.empty()) exePath = std::string("./GENGINE");
+
+            std::string cmd = std::string("\"") + exePath + "\" --game --scene \"" + tmpScene + "\"";
+            printf("[Editor] Launching: %s\n", cmd.c_str());
+            int r = system(cmd.c_str());
+            printf("[Editor] launch returned %d\n", r);
+            (void)r;
+        }
+        ImGui::SameLine();
+        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+        ImGui::SameLine();
+
+        ImGui::SameLine();
+        if (ImGui::Button("lit")) {
+            glShaderType = 0;
+            std::cerr << "[Editor] Shader mode switched to: LIT" << std::endl;
+        }
+
+        ImGui::SameLine(); 
+        if (ImGui::Button("unlit")) {
+            glShaderType = 1;
+            std::cerr << "[Editor] Shader mode switched to: UNLIT" << std::endl;
+        }
+    }
+    ImGui::EndChild();
+
     if (viewportTexture != 0) {
         ImVec2 avail = ImGui::GetContentRegionAvail();
         float aspect = (viewportTexW > 0 && viewportTexH > 0) ? (float)viewportTexW / (float)viewportTexH : (16.0f/9.0f);
@@ -195,6 +257,13 @@ void Editor::SceneGUI() {
             if (ImGui::MenuItem("Sphere")) game->scene->addObject("Sphere", "Sphere_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Plane")) game->scene->addObject("Plane", "Plane_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Pyramid")) game->scene->addObject("Pyramid", "Pyramid_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Player Start")) {
+                // create a small cube to act as player start and give it a reserved name
+                Object* ps = game->scene->addObject("Cube", "PlayerStart");
+                if (ps) {
+                    ps->scale = Vec3d(0.5f);
+                }
+            }
             if(ImGui::BeginMenu("Light")) {
                 if(ImGui::MenuItem("Point Light")) {
                     Light dirLight(LightType::Point, Vec3d(0,0,0), 1.0f);

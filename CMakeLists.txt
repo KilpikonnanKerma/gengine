@@ -13,7 +13,7 @@ find_package(OpenGL REQUIRED)
 
 include_directories(include include/nsmlib/ source shaders)
 
-file(GLOB ENGINE_SOURCES "Engine/*.cpp" "Engine/*.c" "Engine/util/*.cpp" "source/*.cpp")
+file(GLOB ENGINE_SOURCES "Engine/*.cpp" "Engine/util/*.cpp" "source/*.cpp" "include/glad/*.c" )
 
 file(GLOB IMGUI_SRC
     "include/imgui/*.cpp"
@@ -33,3 +33,12 @@ target_compile_definitions(GENGINE PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
 target_include_directories(GENGINE PRIVATE include source shaders include/imgui include/nsmlib include/imgui/backends)
 target_link_libraries(GENGINE PRIVATE SDL2::SDL2 OpenGL::GL)
+
+# Lightweight player runtime (no editor/imgui)
+file(GLOB PLAYER_SOURCES "Engine/*.cpp" "Engine/util/*.cpp" "source/*.cpp" "include/glad/*.c" )
+list(FILTER PLAYER_SOURCES EXCLUDE REGEX "Editor\\.cpp$")
+list(FILTER PLAYER_SOURCES EXCLUDE REGEX "imgui_.*\\.cpp$")
+add_executable(gengine-player ${PLAYER_SOURCES} ${ENGINE_SOURCES} ${IMGUI_SRC})
+target_compile_definitions(gengine-player PRIVATE GLM_ENABLE_EXPERIMENTAL)
+target_include_directories(gengine-player PRIVATE include source shaders include/imgui include/nsmlib include/imgui/backends)
+target_link_libraries(gengine-player PRIVATE SDL2::SDL2 OpenGL::GL)

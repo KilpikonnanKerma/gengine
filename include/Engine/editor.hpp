@@ -12,6 +12,10 @@
 #include <vector>
 #include <iostream>
 
+// 0 - lit
+// 1 - unlit
+extern int glShaderType;
+
 class Editor {
 public:
     Editor(SDL_Window* window, GameMain* game, float& editorWidth);
@@ -24,6 +28,7 @@ public:
     bool isViewportHovered() const { return viewportHovered; }
     void getViewportMouseUV(float& u, float& v) const { u = viewportMouseU; v = viewportMouseV; }
     bool isViewportMouseDown() const { return viewportMouseDown; }
+
 
 private:
     void MainMenu();

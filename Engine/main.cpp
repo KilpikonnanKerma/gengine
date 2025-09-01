@@ -18,7 +18,6 @@
 
 #include <iostream>
 #include "nsm/math.hpp"
-#include <cmath>
 
 #include "shaderc.hpp"
 #include "input.hpp"
@@ -30,14 +29,32 @@
 
 using namespace NMATH;
 
+// Global shader mode index used by the editor (0 = lit, 1 = unlit)
+int glShaderType = 0;
+
 int main(int argc, char* argv[]) {
 
     bool game_mode = false;
-    for(int i = 0; i < argc; i++) {
-        if(std::string(argv[i]) == "--game") { 
+    std::string scenePath = "";
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--game") {
             game_mode = true;
+            continue;
+        }
+        // support --scene <path> and --scene=<path>
+        if (a == "--scene" && i + 1 < argc) {
+            scenePath = std::string(argv[++i]);
+            continue;
+        }
+        const std::string key = "--scene=";
+        if (a.size() > key.size() && a.compare(0, key.size(), key) == 0) {
+            scenePath = a.substr(key.size());
+            continue;
         }
     }
+
+    printf("[Main] Args: game_mode=%d scenePath='%s'\n", game_mode ? 1 : 0, scenePath.c_str());
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         std::cerr << "SDL could not initialize! " << SDL_GetError() << std::endl;
@@ -102,6 +119,10 @@ int main(int argc, char* argv[]) {
     SDL_GL_MakeCurrent(window, glContext);
 
     glEnable(GL_DEPTH_TEST);
+    // Cull back faces by default to avoid rendering interior/back-facing triangles
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     Shaderc ShaderCompiler;
     GLuint shaderProgram = ShaderCompiler.loadShader("shaders/vertex.glsl", "shaders/fragment.glsl");
@@ -126,8 +147,7 @@ int main(int argc, char* argv[]) {
     GameMain game;
     Editor* editor;
 
-        // viewport input state tracking (for edge transitions)
-        bool prevViewportMouseDown = false;
+    bool prevViewportMouseDown = false;
 
     // --- Setup an FBO for rendering the viewport texture ---
     GLuint viewportFBO = 0;
@@ -151,14 +171,41 @@ int main(int argc, char* argv[]) {
     SDL_SetWindowTitle(window, ("GENGINE - Editor (OpenGL " + std::string((const char*)glver) + ")").c_str());
 
     if(game_mode) {
+        if (!scenePath.empty()) {
+            FILE* f = fopen(scenePath.c_str(), "r");
+            if (f) { fclose(f); game.scene->loadScene(scenePath); }
+            else {
+                // try relative to executable base path
+                char* base = SDL_GetBasePath();
+                if (base) {
+                    std::string candidate = std::string(base) + scenePath;
+                    if (fs::exists(candidate)) {
+                        printf("[Main] Found scene at base path: %s\n", candidate.c_str());
+                        game.scene->loadScene(candidate);
+                        SDL_free(base);
+                    } else {
+                        SDL_free(base);
+                        // try relative to repo root / working dir
+                        if (fs::exists(scenePath)) {
+                            printf("[Main] Found scene at cwd: %s\n", scenePath.c_str());
+                            game.scene->loadScene(scenePath);
+                        } else {
+                            printf("[Main] Scene file not found: %s\n", scenePath.c_str());
+                        }
+                    }
+                } else {
+                    if (fs::exists(scenePath)) { game.scene->loadScene(scenePath); }
+                    else printf("[Main] Scene file not found: %s\n", scenePath.c_str());
+                }
+            }
+        }
         game.Start();
     } else {
         editor = new Editor(window, &game, editorWidth);
-    // give editor the viewport texture
-    editor->setViewportTexture(viewportTexture, viewportW, viewportH);
+        editor->setViewportTexture(viewportTexture, viewportW, viewportH);
         game.scene->initGrid(50, 1.f);
-    game.scene->initGizmo();
-    game.scene->initLightGizmo();
+        game.scene->initGizmo();
+        game.scene->initLightGizmo();
     }
 
     while (running) {
@@ -176,17 +223,17 @@ int main(int argc, char* argv[]) {
             inputHandler.handleEvent(event, window);
         }
 
-        inputHandler.processKeyboard(deltaTime);
-
-        if(game_mode)
+        if(game_mode) {
             game.Update(deltaTime);
+        }
 
         int windowWidth, windowHeight;
         SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-        if(!game_mode) {
+        // Update editor UI when in editor mode
+        if (!game_mode) {
             editorWidth = 350.f;
-            editor->Update();
+            if (editor) editor->Update();
         }
 
         float availableWidth = windowWidth - editorWidth;
@@ -207,29 +254,37 @@ int main(int argc, char* argv[]) {
         if (game_mode) {
             viewportX = 0;
             viewportY = 0;
-            viewportWidth  = windowWidth;
-            viewportHeight = windowHeight;
+            viewportWidth = (float)windowWidth;
+            viewportHeight = (float)windowHeight;
         }
 
         glViewport(viewportX, viewportY, (int)viewportWidth, (int)viewportHeight);
-        glClearColor(0.1f, 0.0f, 0.2f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        Mat4 view = lookAt(inputHandler.cameraPos,
-                                    inputHandler.cameraPos + inputHandler.cameraFront,
-                                    inputHandler.cameraUp);
+        Mat4 view;
+        if (game_mode && game.player && game.player->playerObject) {
+            NMATH::Vec3d target = game.player->playerObject->position;
+            NMATH::Vec3d camPos = target + NMATH::Vec3d(0.0f, 2.0f, 6.0f);
+            view = lookAt(camPos, target, NMATH::Vec3d(0.0f,1.0f,0.0f));
+        } else {
+            view = lookAt(inputHandler.cameraPos,
+                          inputHandler.cameraPos + inputHandler.cameraFront,
+                          inputHandler.cameraUp);
+        }
+
         Mat4 projection = perspective(radians(45.0f),
-                                                (float)viewportWidth / (float)viewportHeight,
-                                                0.1f, 100.0f);
+                                    (float)viewportWidth / (float)viewportHeight,
+                                    0.1f, 100.0f);
 
         if (!game_mode && editor) {
+            inputHandler.processKeyboard(deltaTime);
             inputHandler.handleViewportInput(editor, game, view, projection,
                                              viewportX, viewportY, (int)viewportWidth, (int)viewportHeight);
         }
 
         SDL_GetWindowSize(window, &windowWidth, &windowHeight);
         if (windowWidth != viewportW || windowHeight != viewportH) {
-            // resize viewport texture to match window
             viewportW = windowWidth; viewportH = windowHeight;
             glBindTexture(GL_TEXTURE_2D, viewportTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, viewportW, viewportH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -237,8 +292,14 @@ int main(int argc, char* argv[]) {
             editor->setViewportTexture(viewportTexture, viewportW, viewportH);
         }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, viewportFBO);
-        glViewport(0, 0, viewportW, viewportH);
+        // If running the standalone game, render directly to the default framebuffer
+        if (game_mode) {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, viewportW, viewportH);
+        } else {
+            glBindFramebuffer(GL_FRAMEBUFFER, viewportFBO);
+            glViewport(0, 0, viewportW, viewportH);
+        }
         glClearColor(0.1f, 0.0f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -286,13 +347,15 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-
+        
         game.scene->render(shaderProgram, view, projection);
 
         if(!game_mode) {
-            game.scene->drawGrid(shaderProgram, view, projection);
+            GLuint activeForEditor = game.scene->getActiveProgram();
+            if (activeForEditor == 0) activeForEditor = shaderProgram;
+            game.scene->drawGrid(activeForEditor, view, projection);
             glDisable(GL_DEPTH_TEST);
-            game.scene->drawGizmo(shaderProgram, view, projection);
+            game.scene->drawGizmo(activeForEditor, view, projection);
             glEnable(GL_DEPTH_TEST);
         }
 

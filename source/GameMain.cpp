@@ -1,4 +1,5 @@
 #include "GameMain.hpp"
+#include <cstdio>
 
 GameMain::GameMain() {
     scene = new SceneManager();
@@ -15,16 +16,41 @@ GameMain::GameMain() {
     sphere1->position = Vec3d(-5.f, 0.f, 5.f);
     sphere1->scale = Vec3d(1.f);
     sphere1->texture("textures/yoda.png");
+
+    Light pointLight(LightType::Point, Vec3d(1,1,1), 1.0f);
+    pointLight.position = Vec3d(5,0,0);
+    scene->addLight(pointLight);
+
+    player = new Player();
 }
 
-void GameMain::Start() {
+void GameMain::Start()
+{
+    // Log object count for debugging
+    int objCount = (int)scene->objects.size();
+    printf("[GameMain] Scene has %d objects\n", objCount);
 
+    for(int i = 0; i < objCount; i++) {
+        Object* obj = scene->objects[i];
+        if(obj->name == "Player") {
+            player->playerObject = obj;
+            break;
+        }
+    }
 }
 
-void GameMain::Update(float dt) {
-    cube1->rotation.y += 30.f * dt;
+void GameMain::Update(float dt)
+{
+    if (cube1) cube1->rotation.y += 30.f * dt;
+    player->Update(dt);
 }
 
-GameMain::~GameMain() {
-    delete scene;
+GameMain::~GameMain()
+{
+    delete player;
+
+    if(scene) {
+        delete scene;
+        scene = NULL;
+    }
 }

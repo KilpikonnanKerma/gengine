@@ -79,6 +79,8 @@ public:
     void render(GLuint shaderProgram, const Mat4& view, const Mat4& projection);
     Object* pickObject(const Vec3d& rayOrigin, const Vec3d& rayDir);
 
+    GLuint getActiveProgram() const { return lastActiveProgram; }
+
     void initGrid(int gridSize = 20, float spacing = 1.0f);
     void drawGrid(GLuint shaderProgram, const Mat4& view, const Mat4& projection);
 
@@ -88,6 +90,7 @@ public:
 private:
     GLuint gridVAO = 0, gridVBO = 0;
     int gridVertexCount = 0;
+    GLuint lastActiveProgram = 0;
 };
 
 #endif

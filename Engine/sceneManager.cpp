@@ -1,6 +1,14 @@
 #include "Engine/sceneManager.hpp"
 #include <iostream>
 #include <sstream>
+#include "shaderc.hpp"
+#include <sys/stat.h>
+
+extern int glShaderType;
+static GLuint s_unlitProgram = 0;
+static Shaderc s_shaderCompiler;
+static time_t s_unlitVertMtime = 0;
+static time_t s_unlitFragMtime = 0;
 
 SceneManager::SceneManager()
         : selectedObject(NULL),
@@ -19,12 +27,24 @@ SceneManager::SceneManager()
 {
 }
 
+static bool readFileToString(const std::string& path, std::string& out) {
+    std::ifstream f(path, std::ios::in | std::ios::binary);
+    if (!f.is_open()) return false;
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    out = ss.str();
+    return true;
+}
+
 void SceneManager::clearScene() {
     for (size_t i = 0; i < objects.size(); ++i) {
         delete objects[i];
     }
     objects.clear();
     selectedObject = nullptr;
+    // Also clear lights when resetting the scene so loadScene replaces them
+    lights.clear();
+    selectedLightIndex = -1;
 }
 
 static void initMeshForType(Object* obj, const std::string& type) {
@@ -300,7 +320,40 @@ void SceneManager::addLight(const Light& light){
 void SceneManager::update(float deltaTime) {}
 
 void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& projection) {
-    glUseProgram(shaderProgram);
+    const char* unlitVertPath = "shaders/unlit/vertex.glsl";
+    const char* unlitFragPath = "shaders/unlit/fragment.glsl";
+
+    auto getMTime = [](const char* path)->time_t {
+        struct stat st;
+        if (stat(path, &st) == 0) return st.st_mtime;
+        return 0;
+    };
+
+    if (glShaderType == 1) {
+        time_t vm = getMTime(unlitVertPath);
+        time_t fm = getMTime(unlitFragPath);
+        if (s_unlitProgram == 0 || vm != s_unlitVertMtime || fm != s_unlitFragMtime) {
+            if (s_unlitProgram != 0) {
+                glDeleteProgram(s_unlitProgram);
+                s_unlitProgram = 0;
+            }
+            GLuint prog = s_shaderCompiler.loadShader(unlitVertPath, unlitFragPath);
+            if (prog != 0) {
+                s_unlitProgram = prog;
+                s_unlitVertMtime = vm;
+                s_unlitFragMtime = fm;
+                std::cerr << "[SceneManager] Loaded unlit shader id=" << prog << std::endl;
+            } else {
+                std::cerr << "[SceneManager] Failed to load unlit shader, falling back to lit." << std::endl;
+            }
+        }
+    }
+
+    GLuint activeProgram = (glShaderType == 1 && s_unlitProgram != 0) ? s_unlitProgram : shaderProgram;
+    glUseProgram(activeProgram);
+    
+    // store for external users (grid/gizmo drawing callers)
+    this->lastActiveProgram = activeProgram;
 
     int dirCount = 0, pointCount = 0;
     for (size_t i = 0; i < lights.size(); i++) {
@@ -325,12 +378,13 @@ void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& pr
             pointCount++;
         }
     }
-    glUniform1i(glGetUniformLocation(shaderProgram, "uNumDirLights"), dirCount);
-    glUniform1i(glGetUniformLocation(shaderProgram, "uNumPointLights"), pointCount);
+    // set counts on the active program
+    glUniform1i(glGetUniformLocation(activeProgram, "uNumDirLights"), dirCount);
+    glUniform1i(glGetUniformLocation(activeProgram, "uNumPointLights"), pointCount);
 
-    unsigned int modelLoc = glGetUniformLocation(shaderProgram, "model");
-    unsigned int viewLoc  = glGetUniformLocation(shaderProgram, "view");
-    unsigned int projLoc  = glGetUniformLocation(shaderProgram, "projection");
+    unsigned int modelLoc = glGetUniformLocation(activeProgram, "model");
+    unsigned int viewLoc  = glGetUniformLocation(activeProgram, "view");
+    unsigned int projLoc  = glGetUniformLocation(activeProgram, "projection");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view.value_ptr());
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection.value_ptr());
 
@@ -345,14 +399,14 @@ void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& pr
         if (obj->textureID != 0) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, obj->textureID);
-            glUniform1i(glGetUniformLocation(shaderProgram, "uTexture"), 0);
-            glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 1);
+            glUniform1i(glGetUniformLocation(activeProgram, "uTexture"), 0);
+            glUniform1i(glGetUniformLocation(activeProgram, "useTexture"), 1);
         } else {
-            glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), 0);
+            glUniform1i(glGetUniformLocation(activeProgram, "useTexture"), 0);
         }
 
         // ensure override is off for normal object draw
-        glUniform1i(glGetUniformLocation(shaderProgram, "useOverrideColor"), 0);
+        glUniform1i(glGetUniformLocation(activeProgram, "useOverrideColor"), 0);
 
         glBindVertexArray(obj->VAO);
         glDrawElements(GL_TRIANGLES, (GLsizei)obj->indices.size(), GL_UNSIGNED_INT, 0);
@@ -390,11 +444,11 @@ void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& pr
         for (size_t i = 0; i < axes.size(); ++i) {
             const auto& axis = axes[i];
             Mat4 model = translate(Mat4(1.0f), pos);
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"view"),1,GL_FALSE, view.value_ptr());
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"projection"),1,GL_FALSE, projection.value_ptr());
-            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
-            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&axis.color[0]);
+            glUniformMatrix4fv(glGetUniformLocation(activeProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(activeProgram,"view"),1,GL_FALSE, view.value_ptr());
+            glUniformMatrix4fv(glGetUniformLocation(activeProgram,"projection"),1,GL_FALSE, projection.value_ptr());
+            glUniform1i(glGetUniformLocation(activeProgram,"useOverrideColor"), 1);
+            glUniform3fv(glGetUniformLocation(activeProgram,"overrideColor"),1,&axis.color[0]);
 
             glDrawArrays(GL_LINES, (GLint)(i * 2), 2);
         }
@@ -410,9 +464,9 @@ void SceneManager::render(GLuint shaderProgram, const Mat4& view, const Mat4& pr
         glPointSize(10.0f);
         for (size_t i = 0; i < lights.size(); ++i) {
             Mat4 model = translate(Mat4(1.0f), lights[i].position);
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram,"model"),1,GL_FALSE, model.value_ptr());
-            glUniform3fv(glGetUniformLocation(shaderProgram,"overrideColor"),1,&lights[i].color[0]);
-            glUniform1i(glGetUniformLocation(shaderProgram,"useOverrideColor"), 1);
+            glUniformMatrix4fv(glGetUniformLocation(activeProgram,"model"),1,GL_FALSE, model.value_ptr());
+            glUniform3fv(glGetUniformLocation(activeProgram,"overrideColor"),1,&lights[i].color[0]);
+            glUniform1i(glGetUniformLocation(activeProgram,"useOverrideColor"), 1);
             if ((int)i == selectedLightIndex) {
                 // brighter / bigger
                 glPointSize(14.0f);
@@ -497,14 +551,27 @@ void SceneManager::saveScene(const std::string& path) {
         json o;
         o["name"] = obj->name;
         o["type"] = obj->type.empty() ? "Cube" : obj->type;
-    json posArr = json::array(); posArr.push_back(obj->position.x); posArr.push_back(obj->position.y); posArr.push_back(obj->position.z);
-    json rotArr = json::array(); rotArr.push_back(obj->rotation.x); rotArr.push_back(obj->rotation.y); rotArr.push_back(obj->rotation.z);
-    json sclArr = json::array(); sclArr.push_back(obj->scale.x); sclArr.push_back(obj->scale.y); sclArr.push_back(obj->scale.z);
-    o["position"] = posArr;
-    o["rotation"] = rotArr;
-    o["scale"] = sclArr;
+        json posArr = json::array(); posArr.push_back(obj->position.x); posArr.push_back(obj->position.y); posArr.push_back(obj->position.z);
+        json rotArr = json::array(); rotArr.push_back(obj->rotation.x); rotArr.push_back(obj->rotation.y); rotArr.push_back(obj->rotation.z);
+        json sclArr = json::array(); sclArr.push_back(obj->scale.x); sclArr.push_back(obj->scale.y); sclArr.push_back(obj->scale.z);
+        o["position"] = posArr;
+        o["rotation"] = rotArr;
+        o["scale"] = sclArr;
         o["texturePath"] = obj->texturePath;
         j["objects"].push_back(o);
+    }
+
+
+    j["lights"] = json::array();
+
+    for (size_t li = 0; li < lights.size(); ++li) {
+        Light light = lights[li];
+        json l;
+        l["type"] = (light.type == LightType::Directional) ? "Directional" : "Point";
+        l["position"] = { light.position.x, light.position.y, light.position.z };
+        l["color"] = { light.color.x, light.color.y, light.color.z };
+        l["intensity"] = light.intensity;
+        j["lights"].push_back(l);
     }
 
     std::ofstream file(path);
@@ -569,5 +636,41 @@ void SceneManager::loadScene(const std::string& path) {
         }
 
         objects.push_back(o);
+    }
+
+    if (j.find("lights") == j.end() || !j["lights"].is_array()) {
+        std::cerr << "[loadScene] No 'lights' array in scene\n";
+    }
+
+    for (size_t li = 0; li < j["lights"].size(); ++li) {
+        Vec3d color = {1,1,1};
+        Vec3d pos = {0,0,0};
+        LightType type = LightType::Directional;
+
+        const json& lightJson = j["lights"][li];
+        if (lightJson.find("type") != lightJson.end()) {
+            std::string typeStr = lightJson["type"];
+            if (typeStr == "Directional") type = LightType::Directional;
+            else type = LightType::Point;
+        }
+        if (lightJson.find("position") != lightJson.end() && lightJson["position"].size() == 3) {
+            pos = Vec3d(lightJson["position"][0], lightJson["position"][1], lightJson["position"][2]);
+        }
+        if (lightJson.find("color") != lightJson.end() && lightJson["color"].size() == 3) {
+            color = Vec3d(
+                static_cast<float>(lightJson["color"][0]),
+                static_cast<float>(lightJson["color"][1]),
+                static_cast<float>(lightJson["color"][2])
+            );
+        }
+        float intensity = lightJson.value("intensity", 1.0f);
+        Light light(type, color, intensity);
+        light.position = pos;
+        lights.push_back(light);
+        std::string tname = (type == LightType::Directional) ? "Directional" : "Point";
+        std::cerr << "[loadScene] loaded light[" << li << "] type=" << tname
+                  << " pos=(" << pos.x << "," << pos.y << "," << pos.z << ")"
+                  << " color=(" << color.x << "," << color.y << "," << color.z << ")"
+                  << " intensity=" << intensity << std::endl;
     }
 }

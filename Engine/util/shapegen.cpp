@@ -31,13 +31,32 @@ void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, st
             outVertices.push_back({facePositions[f][v], color, normals[f], uvs[v]});
         }
         // two triangles per face
-        outIndices.push_back(startIndex);
-        outIndices.push_back(startIndex+1);
-        outIndices.push_back(startIndex+2);
+        // Ensure winding matches the provided normal (so back-face culling works)
+        Vec3d v0 = facePositions[f][0];
+        Vec3d v1 = facePositions[f][1];
+        Vec3d v2 = facePositions[f][2];
+        Vec3d a = v1 - v0;
+        Vec3d b = v2 - v0;
+        Vec3d cross = a.cross(b);
+        float d = cross.dot(normals[f]);
+        if (d >= 0.0f) {
+            outIndices.push_back(startIndex);
+            outIndices.push_back(startIndex+1);
+            outIndices.push_back(startIndex+2);
 
-        outIndices.push_back(startIndex+2);
-        outIndices.push_back(startIndex+3);
-        outIndices.push_back(startIndex);
+            outIndices.push_back(startIndex+2);
+            outIndices.push_back(startIndex+3);
+            outIndices.push_back(startIndex);
+        } else {
+            // reverse winding
+            outIndices.push_back(startIndex);
+            outIndices.push_back(startIndex+2);
+            outIndices.push_back(startIndex+1);
+
+            outIndices.push_back(startIndex);
+            outIndices.push_back(startIndex+3);
+            outIndices.push_back(startIndex+2);
+        }
     }
 }
 
@@ -63,13 +82,31 @@ void ShapeGenerator::createPlane(float width, float height, std::vector<Vertex>&
     for(int i=0;i<4;i++)
         outVertices.push_back({positions[i], color, normal, uvs[i]});
 
-    outIndices.push_back(startIndex);
-    outIndices.push_back(startIndex+1);
-    outIndices.push_back(startIndex+2);
+    // Ensure winding matches the normal (so back-face culling works)
+    Vec3d v0 = positions[0];
+    Vec3d v1 = positions[1];
+    Vec3d v2 = positions[2];
+    Vec3d a = v1 - v0;
+    Vec3d b = v2 - v0;
+    Vec3d cross = a.cross(b);
+    float d = cross.dot(normal);
+    if (d >= 0.0f) {
+        outIndices.push_back(startIndex);
+        outIndices.push_back(startIndex+1);
+        outIndices.push_back(startIndex+2);
 
-    outIndices.push_back(startIndex+2);
-    outIndices.push_back(startIndex+3);
-    outIndices.push_back(startIndex);
+        outIndices.push_back(startIndex+2);
+        outIndices.push_back(startIndex+3);
+        outIndices.push_back(startIndex);
+    } else {
+        outIndices.push_back(startIndex);
+        outIndices.push_back(startIndex+2);
+        outIndices.push_back(startIndex+1);
+
+        outIndices.push_back(startIndex);
+        outIndices.push_back(startIndex+3);
+        outIndices.push_back(startIndex+2);
+    }
 }
 
 void ShapeGenerator::createPyramid(float size, float height, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {

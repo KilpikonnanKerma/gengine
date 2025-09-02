@@ -68,13 +68,6 @@ void EditorInput::processMouse(SDL_Event& e) {
         float xpos = (float)e.motion.xrel;
         float ypos = (float)e.motion.yrel;
 
-        // Only process mouse movement if it exceeds a small threshold
-        // This prevents spurious camera drift from tiny mouse movements
-        const float movementThreshold = 1.0f;
-        if (absf(xpos) < movementThreshold && absf(ypos) < movementThreshold) {
-            return;
-        }
-
         yaw   += xpos * sensitivity;
         pitch -= ypos * sensitivity;
 
@@ -158,21 +151,23 @@ void EditorInput::handleViewportInput(Editor* editor, GameMain& game,
     if (hovered) {
         // rotate
         if (ImGui::IsMouseDown(1)) {
-            float dx = -io.MouseDelta.x;
-            float dy = io.MouseDelta.y;
-            const float sens = 0.005f;
-            Vec3d f = cameraFront;
-            double pitch = std::asin((double)f.y);
-            double yaw = std::atan2((double)f.z, (double)f.x);
-            yaw += -dx * sens;
-            pitch += -dy * sens;
-            const double limit = 1.5707963267948966 - 0.01;
-            if (pitch > limit) pitch = limit;
-            if (pitch < -limit) pitch = -limit;
-            Vec3d newFront = Vec3d((float)(cos(pitch)*cos(yaw)), (float)sin(pitch), (float)(cos(pitch)*sin(yaw))).normalized();
-            cameraFront = newFront;
-            cameraUp = Vec3d(0,1,0);
-
+            // Only rotate if there is actual mouse movement
+            if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) {
+                float dx = -io.MouseDelta.x;
+                float dy = io.MouseDelta.y;
+                const float sens = 0.005f;
+                Vec3d f = cameraFront;
+                double pitch = std::asin((double)f.y);
+                double yaw = std::atan2((double)f.z, (double)f.x);
+                yaw += -dx * sens;
+                pitch += -dy * sens;
+                const double limit = 1.5707963267948966 - 0.01;
+                if (pitch > limit) pitch = limit;
+                if (pitch < -limit) pitch = -limit;
+                Vec3d newFront = Vec3d((float)(cos(pitch)*cos(yaw)), (float)sin(pitch), (float)(cos(pitch)*sin(yaw))).normalized();
+                cameraFront = newFront;
+                cameraUp = Vec3d(0,1,0);
+            }   
             SDL_ShowCursor(SDL_FALSE);
         } else { SDL_ShowCursor(SDL_TRUE); }
 

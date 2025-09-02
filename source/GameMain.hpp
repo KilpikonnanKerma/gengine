@@ -15,7 +15,7 @@ public:
     SceneManager* scene;
     Player* player;
 
-    Object* floor;
+    //Object* floor;
     Object* cube1;
     Object* sphere1;
 };

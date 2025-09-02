@@ -8,7 +8,7 @@ GameMain::GameMain() {
     dirLight.direction = Vec3d(-0.2f,-1.0f,-0.3f);
     scene->addLight(dirLight);
 
-    cube1 = scene->addObject("Cube", "Cube_1");
+    cube1 = scene->addObject("Player", "Cube_1");
     cube1->position = Vec3d(-5.f, 0.f, 0.f);
     cube1->texture("textures/peppa.png");
 

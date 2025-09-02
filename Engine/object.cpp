@@ -72,10 +72,18 @@ Mat4 Object::getModelMatrix() const {
 
 
 void Object::texture(const std::string& path) {
+    if (path.empty()) return;
+
     texturePath = path;
+
+    if (textureID != 0) {
+        glDeleteTextures(1, &textureID);
+        textureID = 0;
+    }
 
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -88,10 +96,11 @@ void Object::texture(const std::string& path) {
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
-    std::cerr << "[Object] Loaded texture '" << path << "' -> id=" << textureID << " (" << width << "x" << height << ", ch=" << nrChannels << ")" << std::endl;
+        std::cerr << "[Object] Loaded texture '" << path << "' -> id=" << textureID << " (" << width << "x" << height << ", ch=" << nrChannels << ")" << std::endl;
     } else {
         std::cerr << "Failed to load texture: " << path.c_str() << std::endl;
         std::cerr << "stbi_failure_reason: " << stbi_failure_reason() << std::endl;
+        return;
     }
     stbi_image_free(data);
 }

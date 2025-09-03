@@ -3,9 +3,9 @@
 
 #include <vector>
 #include "glad/glad.h"
-#include "util/shapegen.hpp"
+#include "Engine/objects/shapegen.hpp"
 
-#include "nsm/math.hpp"
+#include "math/math.hpp"
 using namespace NMATH;
 
 class Object {
@@ -25,6 +25,7 @@ public:
 
     Object();
     void initCube(float size);
+    void initCylinder(float radius, float height, int segments);
     void initPlane(float width, float height);
     void initSphere(float radius, int segments, int rings);
     void initPyramid(float size, float height);

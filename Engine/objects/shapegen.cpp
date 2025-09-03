@@ -1,4 +1,4 @@
-#include "util/shapegen.hpp"
+#include "Engine/objects/shapegen.hpp"
 
 void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
     float h = size / 2.0f;
@@ -56,6 +56,162 @@ void ShapeGenerator::createCube(float size, std::vector<Vertex>& outVertices, st
             outIndices.push_back(startIndex);
             outIndices.push_back(startIndex+3);
             outIndices.push_back(startIndex+2);
+        }
+    }
+}
+
+void ShapeGenerator::createCylinder(const Vec3d& start, const Vec3d& end, float radius, int segments, std::vector<Vertex>& outVertices, std::vector<unsigned int>& outIndices) {
+    if (segments < 3) segments = 3;
+
+    Vec3d dir = (end - start).normalized();
+
+    Vec3d up(0, 1, 0);
+    if (fabs(dir.dot(up)) > 0.99f) up = Vec3d(1, 0, 0);
+
+    Vec3d side = dir.cross(up).normalized();
+    Vec3d up2 = side.cross(dir).normalized();
+
+    // precompute ring points, radial normals and u coordinates
+    std::vector<Vec3d> ringStart(segments);
+    std::vector<Vec3d> ringEnd(segments);
+    std::vector<Vec3d> radialNormals(segments);
+    std::vector<float> ucoords(segments);
+
+    for (int i = 0; i < segments; ++i) {
+        float theta = 2.0f * PI * (float)i / (float)segments;
+        float c = cosf(theta);
+        float s = sinf(theta);
+        Vec3d radial = side * c + up2 * s;
+        radial = radial.normalized();
+        radialNormals[i] = radial;
+        ringStart[i] = start + radial * radius;
+        ringEnd[i] = end + radial * radius;
+        ucoords[i] = (float)i / (float)segments;
+    }
+
+    Vec3d color = {1,1,1};
+
+    // SIDE: push shared ring vertices (start ring then end ring)
+    unsigned int sideStartIndex = outVertices.size();
+    for (int i = 0; i < segments; ++i) {
+        // start ring vertex
+        outVertices.push_back(Vertex( ringStart[i], color, radialNormals[i], Vec2d(ucoords[i], 0.0f) ));
+    }
+    for (int i = 0; i < segments; ++i) {
+        // end ring vertex
+        outVertices.push_back(Vertex( ringEnd[i], color, radialNormals[i], Vec2d(ucoords[i], 1.0f) ));
+    }
+
+    // side indices (two triangles per segment) with winding check
+    for (int i = 0; i < segments; ++i) {
+        int ni = (i + 1) % segments;
+
+        unsigned int s_i   = sideStartIndex + i;
+        unsigned int s_ni  = sideStartIndex + ni;
+        unsigned int e_i   = sideStartIndex + segments + i;
+        unsigned int e_ni  = sideStartIndex + segments + ni;
+
+        // compute triangle normal using ring positions and compare with outward radial normal
+        Vec3d v0 = ringStart[i];
+        Vec3d v1 = ringStart[ni];
+        Vec3d v2 = ringEnd[ni];
+        Vec3d triNormal = (v1 - v0).cross(v2 - v0);
+        float dotOut = triNormal.dot(radialNormals[i]);
+
+        if (dotOut >= 0.0f) {
+            // original winding (faces outward)
+            outIndices.push_back(s_i);
+            outIndices.push_back(s_ni);
+            outIndices.push_back(e_ni);
+
+            outIndices.push_back(s_i);
+            outIndices.push_back(e_ni);
+            outIndices.push_back(e_i);
+        } else {
+            // flip winding
+            outIndices.push_back(s_i);
+            outIndices.push_back(e_ni);
+            outIndices.push_back(s_ni);
+
+            outIndices.push_back(s_i);
+            outIndices.push_back(e_i);
+            outIndices.push_back(e_ni);
+        }
+    }
+
+    // CAPS
+    // Start cap (near start): normal points -dir
+    Vec3d centerStart = start;
+    Vec3d capNormalStart = dir * -1.0f;
+    Vec2d centerUV = {0.5f, 0.5f};
+
+    unsigned int capStartCenterIndex = outVertices.size();
+    outVertices.push_back(Vertex(centerStart, color, capNormalStart, centerUV));
+
+    // push ring vertices for start cap (with cap normal and cap UV)
+    for (int i = 0; i < segments; ++i) {
+        Vec3d r_i = ringStart[i] - start;
+        Vec2d uv_i = Vec2d( 0.5f + 0.5f * (r_i.dot(side) / radius),  0.5f + 0.5f * (r_i.dot(up2) / radius) );
+        outVertices.push_back(Vertex(ringStart[i], color, capNormalStart, uv_i));
+    }
+
+    // indices for start cap: ensure winding agrees with capNormalStart
+    for (int i = 0; i < segments; ++i) {
+        int ni = (i + 1) % segments;
+        unsigned int ring_i_index = capStartCenterIndex + 1 + i;
+        unsigned int ring_ni_index = capStartCenterIndex + 1 + ni;
+
+        // compute triangle normal for (center, ring_ni, ring_i)
+        Vec3d v0c = centerStart;
+        Vec3d v1c = ringStart[ni];
+        Vec3d v2c = ringStart[i];
+        Vec3d triN = (v1c - v0c).cross(v2c - v0c);
+        if (triN.dot(capNormalStart) >= 0.0f) {
+            outIndices.push_back(capStartCenterIndex);
+            outIndices.push_back(ring_ni_index);
+            outIndices.push_back(ring_i_index);
+        } else {
+            // flip ring order
+            outIndices.push_back(capStartCenterIndex);
+            outIndices.push_back(ring_i_index);
+            outIndices.push_back(ring_ni_index);
+        }
+    }
+
+    // End cap (near end): normal points +dir
+    Vec3d centerEnd = end;
+    Vec3d capNormalEnd = dir;
+
+    unsigned int capEndCenterIndex = outVertices.size();
+    outVertices.push_back(Vertex(centerEnd, color, capNormalEnd, centerUV));
+
+    // push ring vertices for end cap (with cap normal and cap UV)
+    for (int i = 0; i < segments; ++i) {
+        Vec3d r_i = ringEnd[i] - end;
+        Vec2d uv_i = Vec2d( 0.5f + 0.5f * (r_i.dot(side) / radius),  0.5f + 0.5f * (r_i.dot(up2) / radius) );
+        outVertices.push_back(Vertex(ringEnd[i], color, capNormalEnd, uv_i));
+    }
+
+    // indices for end cap: ensure winding agrees with capNormalEnd
+    for (int i = 0; i < segments; ++i) {
+        int ni = (i + 1) % segments;
+        unsigned int ring_i_index = capEndCenterIndex + 1 + i;
+        unsigned int ring_ni_index = capEndCenterIndex + 1 + ni;
+
+        // compute triangle normal for (center, ring_i, ring_ni)
+        Vec3d v0e = centerEnd;
+        Vec3d v1e = ringEnd[i];
+        Vec3d v2e = ringEnd[ni];
+        Vec3d triNe = (v1e - v0e).cross(v2e - v0e);
+        if (triNe.dot(capNormalEnd) >= 0.0f) {
+            outIndices.push_back(capEndCenterIndex);
+            outIndices.push_back(ring_i_index);
+            outIndices.push_back(ring_ni_index);
+        } else {
+            // flip ring order
+            outIndices.push_back(capEndCenterIndex);
+            outIndices.push_back(ring_ni_index);
+            outIndices.push_back(ring_i_index);
         }
     }
 }

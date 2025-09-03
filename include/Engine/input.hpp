@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mouse.h>
 
-#include "nsm/math.hpp"
+#include "math/math.hpp"
 
 #include "imgui.h"
 

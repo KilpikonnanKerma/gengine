@@ -1,7 +1,7 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 
-#include "nsm/math.hpp"
+#include "math/math.hpp"
 
 using namespace NMATH;
 

@@ -3,7 +3,7 @@
 Editor::Editor(SDL_Window* w, GameMain* g, float& width)
     : window(w), game(g), editorWidth(width), viewportTexture(0), viewportTexW(0), viewportTexH(0),
       viewportHovered(false), viewportMouseU(0.0f), viewportMouseV(0.0f), viewportMouseDown(false),
-      currentProjectPath(""), selectedFile(""), objectCount(0), renaming(false), scale(1.0f)
+      currentProjectPath(""), selectedFile(""), objectCount(0), renaming(false)
 {
     // initialize arrays
     pos[0]=pos[1]=pos[2]=0.0f;
@@ -175,15 +175,15 @@ void Editor::EditorGUI() {
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             pos[0]=obj->position.x; pos[1]=obj->position.y; pos[2]=obj->position.z;
             rot[0]=obj->rotation.x; rot[1]=obj->rotation.y; rot[2]=obj->rotation.z;
-            scale = obj->scale.x;
+            scale[0] = obj->scale.x; scale[1] = obj->scale.y; scale[2] = obj->scale.z;
 
             ImGui::InputFloat3("Position", pos, "%.2f");
             ImGui::InputFloat3("Rotation", rot, "%.2f");
-            ImGui::InputFloat("Scale", &scale, 0.0f, 0.0f, "%.2f");
+            ImGui::InputFloat3("Scale", scale, "%.2f");
 
             obj->position = Vec3d(pos[0],pos[1],pos[2]);
             obj->rotation = Vec3d(rot[0],rot[1],rot[2]);
-            obj->scale = Vec3d(scale);
+            obj->scale = Vec3d(scale[0],scale[1],scale[2]);
         }
 
         if (ImGui::CollapsingHeader("Texture", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -254,6 +254,7 @@ void Editor::SceneGUI() {
     if (ImGui::BeginPopupContextWindow("SceneContextMenu", ImGuiPopupFlags_MouseButtonRight)) {
         if (ImGui::BeginMenu("New Object")) {
             if (ImGui::MenuItem("Cube")) game->scene->addObject("Cube", "Cube_" + std::to_string(objectCount++));
+            if (ImGui::MenuItem("Cylinder")) game->scene->addObject("Cylinder", "Cylinder_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Sphere")) game->scene->addObject("Sphere", "Sphere_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Plane")) game->scene->addObject("Plane", "Plane_" + std::to_string(objectCount++));
             if (ImGui::MenuItem("Pyramid")) game->scene->addObject("Pyramid", "Pyramid_" + std::to_string(objectCount++));

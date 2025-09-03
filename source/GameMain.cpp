@@ -1,5 +1,6 @@
 #include "GameMain.hpp"
 #include <cstdio>
+#include "Engine/objects/shapegen.hpp"
 
 GameMain::GameMain() {
     scene = new SceneManager();
@@ -12,10 +13,18 @@ GameMain::GameMain() {
     cube1->position = Vec3d(-5.f, 0.f, 0.f);
     cube1->texture("textures/peppa.png");
 
+    // Two ways of adding objects to a scene from c++
     sphere1 = scene->addObject("Sphere", "Sphere_1");
     sphere1->position = Vec3d(-5.f, 0.f, 5.f);
     sphere1->scale = Vec3d(1.f);
     sphere1->texture("textures/yoda.png");
+
+    Object* cylinder = new Object();
+    cylinder->initCylinder(0.5f, 2.0f, 16);
+    cylinder->name = "cylinderi";
+    cylinder->position = Vec3d(-2.f, 0.f, 2.f);
+	cylinder->texture("textures/yoda.png");
+    scene->objects.push_back(cylinder);
 
     Light pointLight(LightType::Point, Vec3d(1,1,1), 1.0f);
     pointLight.position = Vec3d(5,0,0);

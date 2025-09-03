@@ -1,5 +1,4 @@
-#include "Engine/object.hpp"
-#include "Engine/object.hpp"
+#include "Engine/objects/object.hpp"
 
 Object::Object() {
     position = Vec3d(0.0f);
@@ -13,6 +12,14 @@ Object::Object() {
 void Object::initCube(float size) {
     ShapeGenerator::createCube(size, vertices, indices);
     type="Cube";
+    setupMesh();
+}
+
+void Object::initCylinder(float radius, float height, int segments) {
+    Vec3d start(0.0f, -height/2.0f, 0.0f);
+    Vec3d end(0.0f, height/2.0f, 0.0f);
+    ShapeGenerator::createCylinder(start, end, radius, segments, vertices, indices);
+    type="Cylinder";
     setupMesh();
 }
 
@@ -38,7 +45,7 @@ void Object::setupMesh() {
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
-
+     
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);

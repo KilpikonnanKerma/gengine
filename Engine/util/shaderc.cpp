@@ -1,4 +1,4 @@
-#include "shaderc.hpp"
+#include "Engine/util/shaderc.hpp"
 
 std::string Shaderc::loadShaderSource(const char* filepath) {
     std::ifstream file(filepath);

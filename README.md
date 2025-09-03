@@ -1,7 +1,7 @@
 GENGINE
 ======
 
-GENGINE is a compact, cross-platform OpenGL-based game engine and editor focused on quick iteration and experimentation.
+GENGINE (Not final name hopefully) is a compact, cross-platform game engine and editor that aims for a 2010s AAA look and feel. It is currently very primitive, but in very active development.
 
 The project bundles an editor UI, a small runtime, and a simple scene format so you can prototype scenes, shaders and game logic fast.
 
@@ -19,7 +19,7 @@ Highlights
 Technologies
 -------------------
 
-- Language: C++03
+- Language: C++
 - Rendering: OpenGL (via GLAD)
 - UI: ImGui
 - Windowing/Input: SDL2

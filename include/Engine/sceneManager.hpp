@@ -1,18 +1,19 @@
-#ifndef SCENEMANAGER_H
-#define SCENEMANAGER_H
+#ifndef SCENEMANAGER_HPP
+#define SCENEMANAGER_HPP
 
-#include "Engine/object.hpp"
-#include "Engine/light.hpp"
+#include "Engine/objects/object.hpp"
+#include "Engine/objects/light.hpp"
+#include "Engine/gizmos/transformTool.hpp"
 
 #include "glad/glad.h"
+#include "nlohmann/json.hpp"
 
 #include <cfloat>
 #include <string>
 #include <vector>
 
-#include "nsm/math.hpp"
+#include "math/math.hpp"
 
-#include "nlohmann/json.hpp"
 #include <fstream>
 
 using json = nlohmann::json;
@@ -46,6 +47,7 @@ public:
     
     GizmoAxis grabbedAxis;
     bool axisGrabbed;
+    int grabbedAxisIndex; // -1 if none, 0=X, 1=Y, 2=Z
     bool objectDrag;
     Vec3d dragPlaneNormal;
     Vec3d dragInitialPoint;

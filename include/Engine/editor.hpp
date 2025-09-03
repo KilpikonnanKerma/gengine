@@ -62,7 +62,7 @@ private:
 
     float pos[3];
     float rot[3];
-    float scale;
+    float scale[3];
     char texPath[256];
 };
 

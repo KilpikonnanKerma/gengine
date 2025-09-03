@@ -1,4 +1,4 @@
-#include "input.hpp"
+#include "Engine/input.hpp"
 #include <cmath>
 #include "Engine/editor.hpp"
 #include "GameMain.hpp"
@@ -110,8 +110,8 @@ void EditorInput::handleViewportInput(Editor* editor, GameMain& game,
         float ndcX = u * 2.0f - 1.0f;
         float ndcY = v * 2.0f - 1.0f;
 
-    Vec3d nearP = ClipToWorldHelper::convert(invPV, ndcX, ndcY, -1.0f);
-    Vec3d farP  = ClipToWorldHelper::convert(invPV, ndcX, ndcY,  1.0f);
+        Vec3d nearP = ClipToWorldHelper::convert(invPV, ndcX, ndcY, -1.0f);
+        Vec3d farP  = ClipToWorldHelper::convert(invPV, ndcX, ndcY,  1.0f);
         Vec3d rayDir = (farP - nearP).normalized();
 
         // Try gizmo axis pick first
@@ -120,6 +120,8 @@ void EditorInput::handleViewportInput(Editor* editor, GameMain& game,
             game.scene->grabbedAxis = axis;
             game.scene->axisGrabbed = true;
         } else {
+            game.scene->axisGrabbed = false;
+            game.scene->grabbedAxisIndex = -1;
             // Pick object
             Object* picked = game.scene->pickObject(nearP, rayDir);
             if (picked) {
@@ -141,8 +143,8 @@ void EditorInput::handleViewportInput(Editor* editor, GameMain& game,
     if (hovered && editor->isViewportMouseDown() && game.scene->axisGrabbed) {
         float ndcX = u * 2.0f - 1.0f;
         float ndcY = v * 2.0f - 1.0f;
-    Vec3d nearP = ClipToWorldHelper::convert(invPV, ndcX, ndcY, -1.0f);
-    Vec3d farP  = ClipToWorldHelper::convert(invPV, ndcX, ndcY,  1.0f);
+        Vec3d nearP = ClipToWorldHelper::convert(invPV, ndcX, ndcY, -1.0f);
+        Vec3d farP  = ClipToWorldHelper::convert(invPV, ndcX, ndcY,  1.0f);
         Vec3d rayDir = (farP - nearP).normalized();
         game.scene->dragSelectedObject(nearP, rayDir);
     }
@@ -167,7 +169,7 @@ void EditorInput::handleViewportInput(Editor* editor, GameMain& game,
                 Vec3d newFront = Vec3d((float)(cos(pitch)*cos(yaw)), (float)sin(pitch), (float)(cos(pitch)*sin(yaw))).normalized();
                 cameraFront = newFront;
                 cameraUp = Vec3d(0,1,0);
-            }   
+            }
             SDL_ShowCursor(SDL_FALSE);
         } else { SDL_ShowCursor(SDL_TRUE); }
 

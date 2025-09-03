@@ -17,13 +17,13 @@
 #include "imgui_impl_opengl3.h"
 
 #include <iostream>
-#include "nsm/math.hpp"
+#include "math/math.hpp"
 
-#include "shaderc.hpp"
-#include "input.hpp"
+#include "Engine/util/shaderc.hpp"
+#include "Engine/input.hpp"
 #include "Engine/sceneManager.hpp"
 #include "Engine/editor.hpp"
-#include "util/shapegen.hpp"
+#include "Engine/objects/shapegen.hpp"
 
 #include "GameMain.hpp"
 
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
 			std::cerr << "OpenGL context could not be created for version: " << major << "."<< minor << " Switching to older version" << std::endl;
 			SDL_GL_DeleteContext(glContext);
 			SDL_DestroyWindow(window);
-			window = nullptr;
+			window = NULL;
 			major--; minor = 0;
 			continue;
 		}
@@ -119,7 +119,6 @@ int main(int argc, char* argv[]) {
     SDL_GL_MakeCurrent(window, glContext);
 
     glEnable(GL_DEPTH_TEST);
-    // Cull back faces by default to avoid rendering interior/back-facing triangles
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
@@ -306,47 +305,6 @@ int main(int argc, char* argv[]) {
         glUseProgram(shaderProgram);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, view.value_ptr());
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, projection.value_ptr());
-
-        if(game.scene->axisGrabbed){
-            float vx = (float)inputHandler.mouseX - viewportX;
-            float vy = (float)inputHandler.mouseY - viewportY;
-
-            // If mouse is outside the viewport, skip dragging
-                if (vx < 0 || vx > viewportWidth || vy < 0 || vy > viewportHeight) {
-            } else {
-                float ndcX = (2.0f * vx) / viewportWidth - 1.0f;
-                float ndcY = 1.0f - (2.0f * vy) / viewportHeight;
-
-                Vec4d rayClipNear(ndcX, ndcY, -1.0f, 1.0f);
-                Vec4d rayClipFar(ndcX, ndcY, 1.0f, 1.0f);
-                Mat4 invVP = (projection * view).inverse();
-                Vec4d nearWorld = invVP * rayClipNear; nearWorld /= nearWorld.w;
-                Vec4d farWorld  = invVP * rayClipFar;  farWorld  /= farWorld.w;
-
-                Vec3d rayOriginDrag = Vec3d(nearWorld);
-                Vec3d rayDirDrag = Vec3d(farWorld - nearWorld).normalized();
-
-                if (game.scene->objectDrag && game.scene->selectedObject) {
-                    // intersect ray with drag plane
-                    Vec3d N = game.scene->dragPlaneNormal;
-                    Vec3d planeP = game.scene->dragInitialPoint;
-                    float denom = rayDirDrag.dot(N);
-                    if (fabs(denom) > 1e-6f) {
-                        float t = (planeP - rayOriginDrag).dot(N) / denom;
-                        Vec3d hit = rayOriginDrag + rayDirDrag * t;
-                        Vec3d delta = hit - game.scene->dragInitialPoint;
-                        Vec3d newPos = game.scene->dragInitialObjPos + delta;
-                        if (game.scene->selectedObject) {
-                            game.scene->selectedObject->position = newPos;
-                        } else if (game.scene->selectedLightIndex >= 0) {
-                            game.scene->lights[game.scene->selectedLightIndex].position = newPos;
-                        }
-                    }
-                } else {
-                    game.scene->dragSelectedObject(rayOriginDrag, rayDirDrag);
-                }
-            }
-        }
         
         game.scene->render(shaderProgram, view, projection);
 

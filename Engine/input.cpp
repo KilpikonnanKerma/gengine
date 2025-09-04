@@ -11,7 +11,7 @@ EditorInput::EditorInput(SDL_Window* window) {
 
     yaw = -90.0f;
     pitch = 0.0f;
-    speed = 2.5f;
+    speed = 5.f;
     sensitivity = 0.1f;
 
     // SDL_HideCursor();

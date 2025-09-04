@@ -79,7 +79,7 @@ void Editor::Update() {
                     if (fs::exists(cand)) { exePath = cand; break; }
                 }
             }
-            if (exePath.empty()) exePath = std::string("./GENGINE");
+            if (exePath.empty()) exePath = std::string("GENGINE.exe");
 
             std::string cmd = std::string("\"") + exePath + "\" --game --scene \"" + tmpScene + "\"";
             printf("[Editor] Launching: %s\n", cmd.c_str());

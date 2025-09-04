@@ -18,6 +18,7 @@ public:
     //Object* floor;
     Object* cube1;
     Object* sphere1;
+    Object* floor;
 };
 
 #endif

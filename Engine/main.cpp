@@ -72,6 +72,10 @@ int main(int argc, char* argv[]) {
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
         window = SDL_CreateWindow("GENGINE", 100, 100,
 											1024, 768,
 											SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
@@ -151,20 +155,31 @@ int main(int argc, char* argv[]) {
     // --- Setup an FBO for rendering the viewport texture ---
     GLuint viewportFBO = 0;
     GLuint viewportTexture = 0;
+    GLuint viewportDepthRBO = 0;
     int viewportW = 1024, viewportH = 768;
+
     glGenFramebuffers(1, &viewportFBO);
     glGenTextures(1, &viewportTexture);
     glBindTexture(GL_TEXTURE_2D, viewportTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, viewportW, viewportH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glGenRenderbuffers(1, &viewportDepthRBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, viewportDepthRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, viewportW, viewportH);
+
     glBindFramebuffer(GL_FRAMEBUFFER, viewportFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, viewportTexture, 0);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, viewportDepthRBO);
+
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         std::cerr << "Viewport FBO incomplete: " << status << std::endl;
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
     const GLubyte* glver = glGetString(GL_VERSION);
     SDL_SetWindowTitle(window, ("GENGINE - Editor (OpenGL " + std::string((const char*)glver) + ")").c_str());
@@ -203,7 +218,6 @@ int main(int argc, char* argv[]) {
         editor = new Editor(window, &game, editorWidth);
         editor->setViewportTexture(viewportTexture, viewportW, viewportH);
         game.scene->initGrid(50, 1.f);
-        game.scene->initGizmo();
         game.scene->initLightGizmo();
     }
 
@@ -288,6 +302,13 @@ int main(int argc, char* argv[]) {
             glBindTexture(GL_TEXTURE_2D, viewportTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, viewportW, viewportH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
             glBindTexture(GL_TEXTURE_2D, 0);
+
+            if (viewportDepthRBO != 0) {
+                glBindRenderbuffer(GL_RENDERBUFFER, viewportDepthRBO);
+                glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, viewportW, viewportH);
+				glBindRenderbuffer(GL_RENDERBUFFER, 0);
+            }
+
             editor->setViewportTexture(viewportTexture, viewportW, viewportH);
         }
 

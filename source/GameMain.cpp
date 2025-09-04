@@ -14,11 +14,16 @@ GameMain::GameMain() {
     cube1->texture("textures/peppa.png");
 
     // Two ways of adding objects to a scene from c++
-    sphere1 = scene->addObject("Sphere", "Sphere_1");
+    sphere1 = scene->addObject("Sphere", "Player");
     sphere1->position = Vec3d(-5.f, 0.f, 5.f);
     sphere1->scale = Vec3d(1.f);
-    sphere1->name = "Player";
     sphere1->texture("textures/yoda.png");
+
+    floor = scene->addObject("Plane", "Floor");
+    floor->position = Vec3d(0.f, -1.f, 0.f);
+    floor->scale = Vec3d(50.f);
+	floor->texture("textures/yoda2.png");
+
 
     Object* cylinder = new Object();
     cylinder->initCylinder(0.5f, 2.0f, 16);

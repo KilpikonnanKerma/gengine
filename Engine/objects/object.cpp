@@ -118,5 +118,24 @@ void Object::draw() const {
 }
 
 float Object::boundingRadius() const {
-    return scale.length(); // or a fixed value, or calculate from mesh
+    // Compute a bounding radius from mesh vertex positions (in object local space),
+    // and then account for object scale.
+    float maxDist = 0.0f;
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        const Vertex& v = vertices[i];
+        // assume Vertex has a 'position' Vec3d member
+        float dx = v.pos.x;
+        float dy = v.pos.y;
+        float dz = v.pos.z;
+        float d = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > maxDist) maxDist = d;
+    }
+    if (maxDist <= 0.0f) {
+        // fallback radius for empty meshes
+        maxDist = 0.5f;
+    }
+    // account for non-uniform scaling by using the largest scale component's absolute value
+    float s = std::max(std::max(absf(scale.x), absf(scale.y)), absf(scale.z));
+    if (s <= 0.0f) s = 1.0f;
+    return maxDist * s;
 }

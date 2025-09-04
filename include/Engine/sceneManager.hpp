@@ -2,7 +2,8 @@
 #define SCENEMANAGER_HPP
 
 #include "Engine/objects/object.hpp"
-#include "Engine/objects/light.hpp"
+#include "Engine/lighting/light.hpp"
+#include "Engine/lighting/shadow.hpp"
 #include "Engine/gizmos/transformTool.hpp"
 
 #include "glad/glad.h"
@@ -42,6 +43,11 @@ public:
     SceneManager();
     std::vector<Object*> objects;
     std::vector<Light> lights;
+    std::vector<Shadow*> lightShadows;
+
+    GLuint shadowDepthProgram = 0;
+
+    static const int MAX_DIR_SHADOWS = 4;
 
     Object* selectedObject;
     
@@ -65,7 +71,6 @@ public:
 
     void clearScene();
 
-    void initGizmo();
     void initLightGizmo();
     void drawGizmo(GLuint shaderProgram, const Mat4& view, const Mat4& projection);
     bool pickGizmoAxis(const Vec3d& rayOrigin, const Vec3d& rayDir, GizmoAxis& outAxis);

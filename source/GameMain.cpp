@@ -17,6 +17,7 @@ GameMain::GameMain() {
     sphere1 = scene->addObject("Sphere", "Sphere_1");
     sphere1->position = Vec3d(-5.f, 0.f, 5.f);
     sphere1->scale = Vec3d(1.f);
+    sphere1->name = "Player";
     sphere1->texture("textures/yoda.png");
 
     Object* cylinder = new Object();
@@ -33,33 +34,35 @@ GameMain::GameMain() {
     player = new Player();
 }
 
+GameMain::~GameMain()
+{
+    delete player;
+
+    if (scene) {
+        delete scene;
+        scene = NULL;
+    }
+}
+
 void GameMain::Start()
 {
     // Log object count for debugging
     int objCount = (int)scene->objects.size();
     printf("[GameMain] Scene has %d objects\n", objCount);
 
-    for(int i = 0; i < objCount; i++) {
-        Object* obj = scene->objects[i];
-        if(obj->name == "Player") {
-            player->playerObject = obj;
-            break;
-        }
-    }
+    //for(int i = 0; i < objCount; i++) {
+    //    Object* obj = scene->objects[i];
+    //    if(obj->name == "Player") {
+    //        player->playerObject = obj;
+    //        break;
+    //    }
+    //}
+
+    player->playerObject = sphere1;
 }
 
 void GameMain::Update(float dt)
 {
-    if (cube1) cube1->rotation.y += 30.f * dt;
+    if (sphere1) sphere1->rotation.y += 30.f * dt;
     player->Update(dt);
-}
-
-GameMain::~GameMain()
-{
-    delete player;
-
-    if(scene) {
-        delete scene;
-        scene = NULL;
-    }
 }

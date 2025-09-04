@@ -2,8 +2,8 @@
 #define EDITOR_HPP
 
 #include "SDL2/SDL.h"
-#include "imgui.h"
-#include "imgui_internal.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "Engine/sceneManager.hpp"
 #include "GameMain.hpp"
 #include "filesystem/filesystem.hpp"
@@ -28,7 +28,6 @@ public:
     bool isViewportHovered() const { return viewportHovered; }
     void getViewportMouseUV(float& u, float& v) const { u = viewportMouseU; v = viewportMouseV; }
     bool isViewportMouseDown() const { return viewportMouseDown; }
-
 
 private:
     void MainMenu();
@@ -64,6 +63,16 @@ private:
     float rot[3];
     float scale[3];
     char texPath[256];
+
+    // Build UI state (persisted per-Editor instance)
+    bool showBuildWindow;
+    std::vector<std::string> sceneFiles;   // discovered .gscene files for build dialog
+    std::vector<int> sceneSel;             // parallel selection flags
+    std::string buildMessage;              // status / feedback for build operations
+    bool invokeCMakeBuild;                 // whether to call cmake --build for GENGINE_PLAYER
+
+    // Project browser state
+    std::string selectedFolder;            // moved into class to avoid globals
 };
 
 #endif

@@ -2,19 +2,20 @@
 #define GAME_MAIN_HPP
 
 #include <Engine/game.hpp>
-#include <Engine/sceneManager.hpp>
+#include "Player.hpp"
 
-class GameMain : Game {
+class GameMain : public Game {
 public:
-
     GameMain();
+    ~GameMain();
 
     void Start();
     void Update(float dt);
 
-    SceneManager scene;
+    SceneManager* scene;
+    Player* player;
 
-    Object* floor;
+    //Object* floor;
     Object* cube1;
     Object* sphere1;
 };

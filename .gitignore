@@ -1,2 +1,14 @@
 build/*
+out/
 .vscode/
+
+# visual studio crap
+.vs/
+Debug/
+Release/
+obj/
+*.vcxproj.*
+*.vcxproj
+*.sln
+*.suo
+*.sdf
